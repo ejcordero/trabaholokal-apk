@@ -1,0 +1,7 @@
+{
+  "name": "finals-trabaholokal",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
