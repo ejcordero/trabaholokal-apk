@@ -49,6 +49,8 @@ export interface JobDTO {
   compensationType: string
   positions: number
   employmentType: string
+  workSchedules: string[]
+  workArrangements: string[]
   startDate?: string | null
   endDate?: string | null
   municipalityId?: string | null
@@ -67,6 +69,23 @@ export interface JobDTO {
   requiredSkills: JobRequiredSkillDTO[]
   distanceKm?: number | null
   preferredCategoryMatch?: boolean
+}
+
+export interface WorkerWorkHistoryDTO {
+  id: string
+  workerId: string
+  jobTitle: string
+  employerName?: string | null
+  employerType?: string | null
+  startDate: string
+  endDate?: string | null
+  isCurrent: boolean
+  description?: string | null
+  tasks: string[]
+  referenceName?: string | null
+  referenceContact?: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface JobWithMatch extends JobDTO {
@@ -106,6 +125,8 @@ export interface WorkerSkillDTO {
   tasks?: WorkerSkillTaskDTO[]
   equipment?: WorkerSkillEquipmentDTO[]
 }
+
+
 
 export interface MatchBreakdown {
   skillCoverage: number
@@ -328,6 +349,30 @@ export interface WorkerProfileDTO {
   skills: WorkerSkillDTO[]
   badges: WorkerBadgeDTO[]
   languages?: WorkerLanguageDTO[]
+}
+
+export interface WorkerWorkPreferencesDTO {
+  id?: string
+  workerId: string
+  employmentTypes: string[]
+  workSchedules: string[]
+  workArrangements: string[]
+  earliestStartDate?: string | null
+  willingToRelocate?: boolean | null
+  willingToLiveIn?: boolean | null
+  expectedMinCompensation?: number | null
+  compensationType?: string | null
+}
+
+export interface WorkerWorkPreferencesInput {
+  employmentTypes: string[]
+  workSchedules: string[]
+  workArrangements: string[]
+  earliestStartDate?: string | null
+  willingToRelocate?: boolean | null
+  willingToLiveIn?: boolean | null
+  expectedMinCompensation?: number | null
+  compensationType?: string | null
 }
 
 export interface EmployerProfileDTO {

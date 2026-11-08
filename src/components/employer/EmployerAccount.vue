@@ -55,11 +55,6 @@
             <span class="flex-1">Verification</span>
             <ion-icon :icon="Icons.ChevronRight" class="tl-muted" />
           </button>
-          <button type="button" class="account-row" @click="emit('navigate', 'employment-history')">
-            <ion-icon :icon="Icons.RouteIcon" class="tl-primary" />
-            <span class="flex-1">Employment history</span>
-            <ion-icon :icon="Icons.ChevronRight" class="tl-muted" />
-          </button>
           <button type="button" class="account-row" @click="emit('navigate', 'notifications')">
             <ion-icon :icon="Icons.Bell" class="tl-primary" />
             <span class="flex-1">Notifications</span>

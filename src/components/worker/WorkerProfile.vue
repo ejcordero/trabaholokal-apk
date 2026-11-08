@@ -190,6 +190,139 @@
           </IonCardContent>
         </IonCard>
 
+        <!-- Work preferences -->
+<IonCard>
+  <IonCardContent class="space-y-4">
+    <div>
+      <h2 class="text-base font-semibold">Work Preferences</h2>
+      <p class="text-sm text-medium">
+        Tell employers what kind of work arrangements suit you.
+        You may leave any field unanswered.
+      </p>
+    </div>
+
+    <IonSelect
+      v-model="form.employmentTypes"
+      label="Preferred Employment Types"
+      label-placement="stacked"
+      placeholder="Select employment types"
+      interface="alert"
+      :multiple="true"
+      fill="outline"
+    >
+      <IonSelectOption
+        v-for="option in EMPLOYMENT_TYPE_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.label }}
+      </IonSelectOption>
+    </IonSelect>
+
+    <IonSelect
+      v-model="form.workSchedules"
+      label="Preferred Work Schedules"
+      label-placement="stacked"
+      placeholder="Select schedules"
+      interface="alert"
+      :multiple="true"
+      fill="outline"
+    >
+      <IonSelectOption
+        v-for="option in WORK_SCHEDULE_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.label }}
+      </IonSelectOption>
+    </IonSelect>
+
+    <IonSelect
+      v-model="form.workArrangements"
+      label="Preferred Work Arrangements"
+      label-placement="stacked"
+      placeholder="Select arrangements"
+      interface="alert"
+      :multiple="true"
+      fill="outline"
+    >
+      <IonSelectOption
+        v-for="option in WORK_ARRANGEMENT_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.label }}
+      </IonSelectOption>
+    </IonSelect>
+
+    <div>
+      <label class="text-sm font-medium">Earliest Start Date</label>
+      <IonInput
+        v-model="form.earliestStartDate"
+        type="date"
+        fill="outline"
+        class="mt-2"
+      />
+    </div>
+
+    <IonSelect
+      v-model="form.willingToRelocate"
+      label="Willing to Relocate?"
+      label-placement="stacked"
+      placeholder="No preference specified"
+      interface="popover"
+      fill="outline"
+    >
+      <IonSelectOption value="yes">Yes</IonSelectOption>
+      <IonSelectOption value="no">No</IonSelectOption>
+    </IonSelect>
+
+    <IonSelect
+      v-model="form.willingToLiveIn"
+      label="Willing to Work Live-in?"
+      label-placement="stacked"
+      placeholder="No preference specified"
+      interface="popover"
+      fill="outline"
+    >
+      <IonSelectOption value="yes">Yes</IonSelectOption>
+      <IonSelectOption value="no">No</IonSelectOption>
+    </IonSelect>
+
+    <div>
+      <h3 class="text-sm font-medium">Expected Minimum Compensation</h3>
+      <p class="text-xs text-medium mb-2">
+        Optional. Enter your preferred minimum pay.
+      </p>
+
+      <IonInput
+        v-model="form.expectedMinCompensation"
+        type="number"
+        min="0"
+        placeholder="e.g. 500"
+        fill="outline"
+      />
+
+      <IonSelect
+        v-model="form.compensationType"
+        label="Compensation Basis"
+        label-placement="stacked"
+        placeholder="Select pay basis"
+        interface="popover"
+        fill="outline"
+      >
+        <IonSelectOption
+          v-for="option in COMPENSATION_TYPE_OPTIONS"
+          :key="option.value"
+          :value="option.value"
+        >
+          {{ option.label }}
+        </IonSelectOption>
+      </IonSelect>
+    </div>
+  </IonCardContent>
+</IonCard>
+
         <!-- Save -->
         <IonButton
           expand="block"
@@ -249,6 +382,8 @@ import {
   getWorkerMe,
   getMunicipalities,
   updateWorkerMe,
+  getWorkerWorkPreferences,
+  saveWorkerWorkPreferences,
   useToast,
 } from './_lib'
 
@@ -257,6 +392,36 @@ const emit = defineEmits<{
 }>()
 
 const { toast } = useToast()
+
+const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: 'regular', label: 'Regular' },
+  { value: 'contractual', label: 'Contractual' },
+  { value: 'job_order', label: 'Job Order (JO)' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+]
+
+const WORK_SCHEDULE_OPTIONS = [
+  { value: 'full_time', label: 'Full-time' },
+  { value: 'part_time', label: 'Part-time' },
+  { value: 'weekends', label: 'Weekends' },
+  { value: 'flexible', label: 'Flexible schedule' },
+]
+
+const WORK_ARRANGEMENT_OPTIONS = [
+  { value: 'onsite', label: 'On-site' },
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+]
+
+const COMPENSATION_TYPE_OPTIONS = [
+  { value: 'daily', label: 'Per Day' },
+  { value: 'weekly', label: 'Per Week' },
+  { value: 'monthly', label: 'Per Month' },
+  { value: 'fixed', label: 'Fixed / Project' },
+  { value: 'hourly', label: 'Per Hour' },
+]
 
 const loading = ref(true)
 const saving = ref(false)
@@ -274,6 +439,14 @@ const form = reactive({
   preferredCategories: [] as string[],
   preferredDistanceKm: 30,
   available: false,
+  employmentTypes: [] as string[],
+  workSchedules: [] as string[],
+  workArrangements: [] as string[],
+  earliestStartDate: '',
+  willingToRelocate: '' as '' | 'yes' | 'no',
+  willingToLiveIn: '' as '' | 'yes' | 'no',
+  expectedMinCompensation: '',
+  compensationType: '',
 })
 
 onMounted(loadProfile)
@@ -282,9 +455,10 @@ async function loadProfile(): Promise<void> {
   loading.value = true
 
   try {
-    const [worker, municipalityList] = await Promise.all([
+    const [worker, municipalityList, preferences] = await Promise.all([
       getWorkerMe(),
       getMunicipalities(),
+      getWorkerWorkPreferences(),
     ])
 
     profile.value = worker
@@ -309,6 +483,30 @@ async function loadProfile(): Promise<void> {
         : 30
 
     form.available = worker.available ?? false
+
+    if (preferences) {
+      form.employmentTypes = [...preferences.employmentTypes]
+      form.workSchedules = [...preferences.workSchedules]
+      form.workArrangements = [...preferences.workArrangements]
+      form.earliestStartDate = preferences.earliestStartDate ?? ''
+
+      form.willingToRelocate =
+        preferences.willingToRelocate == null
+          ? ''
+          : preferences.willingToRelocate ? 'yes' : 'no'
+
+      form.willingToLiveIn =
+        preferences.willingToLiveIn == null
+          ? ''
+          : preferences.willingToLiveIn ? 'yes' : 'no'
+
+      form.expectedMinCompensation =
+        preferences.expectedMinCompensation == null
+          ? ''
+          : String(preferences.expectedMinCompensation)
+
+      form.compensationType = preferences.compensationType ?? ''
+    }
   } catch (error: any) {
     toast({
       message: error?.message || 'Failed to load your profile.',
@@ -366,6 +564,30 @@ async function saveProfile(): Promise<void> {
     return
   }
 
+  const compensationText = form.expectedMinCompensation.trim()
+
+if (
+  compensationText !== '' &&
+  (!Number.isFinite(Number(compensationText)) ||
+    Number(compensationText) < 0)
+) {
+  toast({
+    message: 'Please enter a valid non-negative expected compensation.',
+    duration: 3000,
+    color: 'warning',
+  })
+  return
+}
+
+if (compensationText !== '' && !form.compensationType) {
+  toast({
+    message: 'Please select a compensation basis.',
+    duration: 3000,
+    color: 'warning',
+  })
+  return
+}
+
   saving.value = true
 
   try {
@@ -380,6 +602,33 @@ async function saveProfile(): Promise<void> {
       preferredDistanceKm: form.preferredDistanceKm,
       available: form.available,
     })
+
+    await saveWorkerWorkPreferences({
+  employmentTypes: form.employmentTypes,
+  workSchedules: form.workSchedules,
+  workArrangements: form.workArrangements,
+  earliestStartDate: form.earliestStartDate || null,
+
+  willingToRelocate:
+    form.willingToRelocate === ''
+      ? null
+      : form.willingToRelocate === 'yes',
+
+  willingToLiveIn:
+    form.willingToLiveIn === ''
+      ? null
+      : form.willingToLiveIn === 'yes',
+
+  expectedMinCompensation:
+    form.expectedMinCompensation.trim() === ''
+      ? null
+      : Number(form.expectedMinCompensation),
+
+  compensationType:
+    form.expectedMinCompensation.trim() === ''
+      ? null
+      : form.compensationType || null,
+})
 
     profile.value = updated
 

@@ -249,6 +249,209 @@
         </div>
       </div>
 
+      <!-- Previous Work Experience -->
+<div class="space-y-3">
+  <SectionTitle>
+    Previous Work Experience
+    <template #action>
+      <RefreshHeader
+        :refreshing="workHistoryLoading"
+        @refresh="refreshWorkHistory"
+      />
+    </template>
+  </SectionTitle>
+
+  <LoadingCards v-if="workHistoryLoading" :count="2" />
+
+  <div v-else-if="workHistoryError" class="space-y-2">
+    <p class="text-sm tl-error">{{ workHistoryError }}</p>
+    <button
+      type="button"
+      class="tl-btn outline"
+      @click="refreshWorkHistory"
+    >
+      Try again
+    </button>
+  </div>
+
+  <p
+    v-else-if="!workHistory.length"
+    class="text-xs tl-muted"
+  >
+    No previous work experience has been added by this worker.
+  </p>
+
+  <div v-else class="space-y-2">
+    <div
+      v-for="entry in workHistory"
+      :key="entry.id"
+      class="tl-card"
+      style="background: var(--tl-bg)"
+    >
+      <div class="tl-card-body space-y-2">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold">{{ entry.jobTitle }}</p>
+            <p class="text-xs tl-muted">
+              {{ entry.employerName || 'Employer not specified' }}
+            </p>
+          </div>
+
+          <span v-if="entry.isCurrent" class="tl-pill approved">
+            Current
+          </span>
+        </div>
+
+        <p class="text-xs tl-muted">
+          {{ formatDate(entry.startDate) }}
+          –
+          {{ entry.isCurrent ? 'Present' : formatDate(entry.endDate) }}
+        </p>
+
+        <p v-if="entry.employerType" class="text-xs tl-muted">
+          {{ entry.employerType.replace(/_/g, ' ') }}
+        </p>
+
+        <p v-if="entry.description" class="text-sm">
+          {{ entry.description }}
+        </p>
+
+        <div v-if="entry.tasks?.length" class="pt-2 border-t">
+          <p class="text-xs font-semibold mb-1">
+            Tasks and responsibilities
+          </p>
+
+          <ul class="list-disc pl-5 space-y-1">
+            <li
+              v-for="(task, index) in entry.tasks"
+              :key="index"
+              class="text-xs"
+            >
+              {{ task }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Work Preferences -->
+<div class="space-y-3">
+  <SectionTitle>
+    Work Preferences
+    <template #action>
+      <RefreshHeader
+        :refreshing="workPreferencesLoading"
+        @refresh="refreshWorkPreferences"
+      />
+    </template>
+  </SectionTitle>
+
+  <LoadingCards v-if="workPreferencesLoading" :count="1" />
+
+  <div v-else-if="workPreferencesError" class="space-y-2">
+    <p class="text-sm tl-error">{{ workPreferencesError }}</p>
+    <button
+      type="button"
+      class="tl-btn outline"
+      @click="refreshWorkPreferences"
+    >
+      Try again
+    </button>
+  </div>
+
+  <p
+    v-else-if="!workPreferences"
+    class="text-xs tl-muted"
+  >
+    No work preferences have been provided by this worker.
+  </p>
+
+  <div v-else class="tl-card" style="background: var(--tl-bg)">
+    <div class="tl-card-body space-y-3">
+
+      <div>
+        <p class="text-xs font-semibold uppercase tl-muted mb-1">
+          Employment types
+        </p>
+        <p class="text-sm">
+          {{ preferenceLabels(workPreferences.employmentTypes, EMPLOYMENT_LABELS) }}
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase tl-muted mb-1">
+          Preferred schedules
+        </p>
+        <p class="text-sm">
+          {{ preferenceLabels(workPreferences.workSchedules, SCHEDULE_LABELS) }}
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase tl-muted mb-1">
+          Work arrangements
+        </p>
+        <p class="text-sm">
+          {{ preferenceLabels(workPreferences.workArrangements, ARRANGEMENT_LABELS) }}
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase tl-muted mb-1">
+          Earliest start date
+        </p>
+        <p class="text-sm">
+          {{ workPreferences.earliestStartDate
+            ? formatDate(workPreferences.earliestStartDate)
+            : 'Not specified' }}
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <p class="text-xs font-semibold uppercase tl-muted mb-1">
+            Willing to relocate
+          </p>
+          <p class="text-sm">
+            {{ workPreferences.willingToRelocate == null
+              ? 'Not specified'
+              : workPreferences.willingToRelocate ? 'Yes' : 'No' }}
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs font-semibold uppercase tl-muted mb-1">
+            Willing to live in
+          </p>
+          <p class="text-sm">
+            {{ workPreferences.willingToLiveIn == null
+              ? 'Not specified'
+              : workPreferences.willingToLiveIn ? 'Yes' : 'No' }}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase tl-muted mb-1">
+          Expected minimum compensation
+        </p>
+        <p class="text-sm">
+          <template v-if="workPreferences.expectedMinCompensation != null">
+            ₱{{ workPreferences.expectedMinCompensation.toLocaleString('en-PH') }}
+            / {{ COMPENSATION_LABELS[workPreferences.compensationType ?? ''] ?? workPreferences.compensationType }}
+          </template>
+          <template v-else>
+            Not specified
+          </template>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
       <div v-if="application.employerNote" class="tl-card" style="background: var(--tl-bg)">
         <div class="tl-card-body">
           <p class="text-xs uppercase tl-muted">Your note</p>
@@ -311,11 +514,15 @@ import {
   APPLICATION_STATUSES,
   EMPLOYMENT_STATUSES,
   getPassport,
+  listEmployerWorkerWorkHistory,
   updateApplicationStatus,
   useAsync,
   useToast,
   type ApplicationDTO,
   type PassportDTO,
+  type WorkerWorkHistoryDTO,
+  getEmployerWorkerWorkPreferences,
+type WorkerWorkPreferencesDTO,
 } from '../worker/_lib'
 import {
   Avatar,
@@ -343,7 +550,109 @@ const emit = defineEmits<{
   (e: 'updated', application: ApplicationDTO): void
 }>()
 
+const EMPLOYMENT_LABELS: Record<string, string> = {
+  regular: 'Regular',
+  contractual: 'Contractual',
+  job_order: 'Job Order',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+}
+
+const SCHEDULE_LABELS: Record<string, string> = {
+  full_time: 'Full-time',
+  part_time: 'Part-time',
+  weekends: 'Weekends',
+  flexible: 'Flexible',
+}
+
+const ARRANGEMENT_LABELS: Record<string, string> = {
+  onsite: 'On-site',
+  remote: 'Remote',
+  hybrid: 'Hybrid',
+}
+
+const COMPENSATION_LABELS: Record<string, string> = {
+  daily: 'Per Day',
+  weekly: 'Per Week',
+  monthly: 'Per Month',
+  fixed: 'Fixed / Project',
+  hourly: 'Per Hour',
+}
+
+function preferenceLabels(
+  values: string[],
+  labels: Record<string, string>
+): string {
+  return values.length
+    ? values.map(value => labels[value] ?? value).join(' · ')
+    : 'Not specified'
+}
+
 const { toast } = useToast()
+const workHistory = ref<WorkerWorkHistoryDTO[]>([])
+const workHistoryLoading = ref(false)
+const workHistoryError = ref('')
+const workPreferences = ref<WorkerWorkPreferencesDTO | null>(null)
+const workPreferencesLoading = ref(false)
+const workPreferencesError = ref('')
+
+async function refreshWorkPreferences() {
+  const workerId = props.application?.workerId
+
+  if (!workerId) {
+    workPreferences.value = null
+    return
+  }
+
+  workPreferencesLoading.value = true
+  workPreferencesError.value = ''
+
+  try {
+    workPreferences.value =
+      await getEmployerWorkerWorkPreferences(workerId)
+  } catch (error) {
+    workPreferencesError.value =
+      error instanceof Error
+        ? error.message
+        : 'Failed to load applicant work preferences.'
+  } finally {
+    workPreferencesLoading.value = false
+  }
+}
+
+async function refreshWorkHistory() {
+  const workerId = props.application?.workerId
+
+  if (!workerId) {
+    workHistory.value = []
+    return
+  }
+
+  workHistoryLoading.value = true
+  workHistoryError.value = ''
+
+  try {
+    workHistory.value = await listEmployerWorkerWorkHistory(workerId)
+  } catch (error) {
+    workHistoryError.value =
+      error instanceof Error
+        ? error.message
+        : 'Failed to load previous work experience.'
+  } finally {
+    workHistoryLoading.value = false
+  }
+}
+
+watch(
+  () => props.application?.workerId,
+  () => {
+    void refreshWorkHistory()
+    void refreshWorkPreferences()
+  },
+  { immediate: true }
+)
+
 const note = ref('')
 const acting = ref(false)
 const confirm = ref<'accepted' | 'rejected' | null>(null)

@@ -9,6 +9,10 @@ export const JOB_CATEGORIES = [
   { value: 'daily_wage', label: 'Daily Wage' },
   { value: 'urgent', label: 'Urgent Employment' },
   { value: 'contractual', label: 'Contractual' },
+  { value: 'household_services', label: 'Household Services' },
+{ value: 'cleaning_maintenance', label: 'Cleaning & Maintenance' },
+{ value: 'caregiving', label: 'Caregiving' },
+{ value: 'transportation', label: 'Transportation & Delivery' },
 ] as const
 
 export const EMPLOYMENT_TYPES = [

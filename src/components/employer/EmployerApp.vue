@@ -4,11 +4,6 @@
       <template v-if="view">
         <EmployerProfile v-if="view.name === 'profile'" @back="closeView" />
         <EmployerVerification v-else-if="view.name === 'verification'" @back="closeView" />
-        <EmployerEmploymentHistory
-          v-else-if="view.name === 'employment-history'"
-          @back="closeView"
-          @open-employment="openEmployment"
-        />
         <EmployerNotifications v-else-if="view.name === 'notifications'" @back="closeNotifications" />
         <EmployerJobForm
           v-else-if="view.name === 'job-form'"
@@ -87,7 +82,6 @@ import EmployerAccount from './EmployerAccount.vue'
 import EmployerApplicantDetails from './EmployerApplicantDetails.vue'
 import EmployerApplicants from './EmployerApplicants.vue'
 import EmployerEmploymentDetails from './EmployerEmploymentDetails.vue'
-import EmployerEmploymentHistory from './EmployerEmploymentHistory.vue'
 import EmployerHome from './EmployerHome.vue'
 import EmployerJobDetails from './EmployerJobDetails.vue'
 import EmployerJobForm from './EmployerJobForm.vue'
@@ -99,12 +93,11 @@ import EmployerVerification from './EmployerVerification.vue'
 import EmployerWorkforce from './EmployerWorkforce.vue'
 
 type TabKey = 'home' | 'jobs' | 'applicants' | 'workforce' | 'account'
-type AccountView = 'profile' | 'verification' | 'employment-history' | 'notifications'
+type AccountView = 'profile' | 'verification' | 'notifications'
 
 type SubView =
   | { name: 'profile' }
   | { name: 'verification' }
-  | { name: 'employment-history' }
   | { name: 'notifications' }
   | { name: 'job-form'; jobId?: string }
   | { name: 'job-details'; jobId: string }

@@ -219,7 +219,7 @@ import {
   createEvaluation,
   EMPLOYMENT_STATUSES,
   getEmployment,
-  updateEmployment,
+  completeEmployment,
   useAsync,
   useToast,
   type AccomplishmentDTO,
@@ -278,17 +278,20 @@ const canComplete = computed(() =>
 async function markCompleted() {
   const current = employment.value
   if (!current) return
+
   completeOpen.value = false
   completing.value = true
+
   try {
-    const updated = await updateEmployment(current.id, {
-      status: 'completed',
-      end_date: new Date().toISOString().slice(0, 10),
-    })
+    const updated = await completeEmployment(current.id)
+
     setData(updated)
     await toast('Employment marked as completed.')
   } catch (e: any) {
-    await toast(e?.message || 'Could not complete the employment.', 'danger')
+    await toast(
+      e?.message || 'Could not complete the employment.',
+      'danger'
+    )
   } finally {
     completing.value = false
   }

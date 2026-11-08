@@ -72,6 +72,42 @@
             </Field>
           </div>
 
+          <Field label="Work schedule" hint="Select all schedules that apply.">
+  <IonSelect
+    v-model="form.workSchedules"
+    multiple
+    interface="popover"
+    placeholder="Select work schedules"
+    class="tl-input"
+  >
+    <IonSelectOption
+      v-for="option in workScheduleOptions"
+      :key="option.value"
+      :value="option.value"
+    >
+      {{ option.label }}
+    </IonSelectOption>
+  </IonSelect>
+</Field>
+
+<Field label="Work arrangement" hint="Select all arrangements available for this job.">
+  <IonSelect
+    v-model="form.workArrangements"
+    multiple
+    interface="popover"
+    placeholder="Select work arrangements"
+    class="tl-input"
+  >
+    <IonSelectOption
+      v-for="option in workArrangementOptions"
+      :key="option.value"
+      :value="option.value"
+    >
+      {{ option.label }}
+    </IonSelectOption>
+  </IonSelect>
+</Field>
+
           <div class="grid grid-cols-2 gap-2">
             <Field label="Start date">
               <input v-model="form.startDate" class="tl-input" type="date" />
@@ -231,6 +267,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { IonSelect, IonSelectOption } from '@ionic/vue'
 
 import {
   COMPENSATION_TYPES,
@@ -269,6 +306,18 @@ const { toast } = useToast()
 const isEdit = computed(() => Boolean(props.jobId))
 const categoryOptions = JOB_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))
 const employmentTypeOptions = EMPLOYMENT_TYPES.map((c) => ({ value: c.value, label: c.label }))
+const workScheduleOptions = [
+  { value: 'full_time', label: 'Full-time' },
+  { value: 'part_time', label: 'Part-time' },
+  { value: 'weekends', label: 'Weekends' },
+  { value: 'flexible', label: 'Flexible schedule' },
+]
+
+const workArrangementOptions = [
+  { value: 'onsite', label: 'On-site' },
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+]
 const urgencyOptions = URGENCY_LEVELS.map((c) => ({ value: c.value, label: c.label }))
 const compensationOptions = COMPENSATION_TYPES.map((c) => ({ value: c.value, label: c.label }))
 const requiredSkills = ref<RequiredSkill[]>([])
@@ -299,6 +348,10 @@ const form = reactive({
   urgencyLevel: 'normal',
   workingHours: '',
   applicationDeadline: '',
+  workSchedules: [] as string[],
+workArrangements: [] as string[],
+requiresRelocation: false,
+liveInAvailable: false,
 })
 
 const {
@@ -346,6 +399,8 @@ watch(
     form.urgencyLevel = job.urgencyLevel
     form.workingHours = job.workingHours ?? ''
     form.applicationDeadline = job.applicationDeadline ?? ''
+    form.workSchedules = [...(job.workSchedules ?? [])]
+form.workArrangements = [...(job.workArrangements ?? [])]
     requiredSkills.value = job.requiredSkills.map((s) => ({
       skillId: s.skillId,
       skillName: s.skillName,
@@ -422,8 +477,10 @@ function buildPayload(status: string): Record<string, unknown> {
     compensation_type: form.compensationType,
     positions: Math.max(1, Number(form.positions) || 1),
     employment_type: form.employmentType,
-    urgency_level: form.urgencyLevel,
-    status,
+work_schedules: form.workSchedules,
+work_arrangements: form.workArrangements,
+urgency_level: form.urgencyLevel,
+status,
     required_skills: requiredSkills.value.map((s) => ({
       skill_id: s.skillId,
       importance: s.importance,

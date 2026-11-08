@@ -1013,7 +1013,10 @@ export const JobCard = defineComponent({
   setup(props, { emit }) {
     return () => {
       const job = props.job
-      return h('div', { class: 'tl-card clickable', onClick: () => emit('open', job.id) }, [
+      return h('div', { class: 'tl-card clickable', onClick: () => {
+        console.log('[JobCard] Clicked:', job.id)
+        emit('open', job.id)
+      }}, [
         h('div', { class: 'tl-card-body' }, [
           h('div', { class: 'flex items-start justify-between gap-2' }, [
             h('div', { class: 'min-w-0 flex-1' }, [

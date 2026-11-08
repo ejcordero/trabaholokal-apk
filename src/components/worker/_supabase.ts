@@ -4,7 +4,8 @@ import type {
   AccomplishmentDTO, RenewalDTO, NotificationDTO, ReportDTO, PassportDTO, SkillUnlockDTO,
   FairPayResult, MunicipalityDTO, SkillDTO, WorkerProfileDTO, EmployerProfileDTO,
   AdminUserRow, AdminUserDetail, AuditLogDTO, OverviewData, WorkerSkillDTO,
-WorkerSkillTaskDTO, WorkerSkillEquipmentDTO, WorkerLanguageDTO,
+WorkerSkillTaskDTO, WorkerSkillEquipmentDTO, WorkerLanguageDTO, WorkerWorkHistoryDTO, WorkerWorkPreferencesDTO,
+WorkerWorkPreferencesInput,
 EvaluationDTO, JobFilters,
 } from './_types'
 import { computeMatch, classifyFairPay, haversineKm } from './_match'
@@ -26,6 +27,20 @@ async function uid(): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.user) throw new ApiError('You must be signed in.', 401)
   return session.user.id
+}
+
+async function getPreferencesForWorkerId(
+  workerId: string
+): Promise<WorkerWorkPreferencesDTO | null> {
+  const { data, error } = await supabase
+    .from('worker_work_preferences')
+    .select('*')
+    .eq('worker_id', workerId)
+    .maybeSingle()
+
+  assertError(error, 'Failed to load work preferences.')
+
+  return data ? mapWorkerWorkPreferences(data) : null
 }
 
 function assertError(error: any, fallback: string): void {
@@ -66,6 +81,8 @@ function mapJobView(r: any, workerLat?: number | null, workerLon?: number | null
     compensationType: r.compensation_type,
     positions: r.positions,
     employmentType: r.employment_type,
+    workSchedules: r.work_schedules ?? [],
+    workArrangements: r.work_arrangements ?? [],
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
     municipalityId: r.municipality_id ?? null,
@@ -102,6 +119,8 @@ function mapJobRow(r: any, employer?: any): JobDTO {
     compensationType: r.compensation_type,
     positions: r.positions,
     employmentType: r.employment_type,
+    workSchedules: r.work_schedules ?? [],
+    workArrangements: r.work_arrangements ?? [],
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
     municipalityId: r.municipality_id ?? null,
@@ -167,6 +186,7 @@ export async function listJobs(
   let workerLon: number | null = null
   let available = true
   let preferredCategories: string[] = []
+  let workerPreferences: WorkerWorkPreferencesDTO | null = null
 
   const {
     data: { session },
@@ -208,6 +228,8 @@ export async function listJobs(
       preferredCategories = Array.isArray(wp.preferred_categories)
         ? wp.preferred_categories
         : []
+
+        workerPreferences = await getPreferencesForWorkerId(wp.id)
     }
   }
 
@@ -416,15 +438,54 @@ export async function getJob(jobId: string): Promise<JobWithMatch> {
       .select('id, municipality_id, latitude, longitude, available, skills:worker_skills(skill_id, level, experience_level, verified_job_count)')
       .eq('account_id', session.user.id)
       .maybeSingle()
-    if (wp) {
-      const m = computeMatch(
-        { skills: (wp.skills ?? []).map((s: any) => ({ skillId: s.skill_id, level: s.level, experienceLevel: s.experience_level, verifiedJobCount: s.verified_job_count })), municipalityId: wp.municipality_id, latitude: wp.latitude, longitude: wp.longitude, available: wp.available },
-        { requiredSkills: (data.required_skills ?? []).map((s: any) => ({ skillId: s.skill_id, importance: s.importance, weight: s.weight })), municipalityId: data.municipality_id, latitude: data.latitude, longitude: data.longitude }
-      )
-      job.match = { score: m.score, grade: m.grade, breakdown: m.breakdown }
-      const { data: app } = await supabase.from('job_applications').select('id').eq('job_id', jobId).eq('worker_id', wp.id).maybeSingle()
-      job.applied = !!app
-    }
+      if (wp) {
+        const workerPreferences = await getPreferencesForWorkerId(wp.id)
+      
+        const m = computeMatch(
+          {
+            skills: (wp.skills ?? []).map((s: any) => ({
+              skillId: s.skill_id,
+              level: s.level,
+              experienceLevel: s.experience_level,
+              verifiedJobCount: s.verified_job_count,
+            })),
+            municipalityId: wp.municipality_id,
+            latitude: wp.latitude,
+            longitude: wp.longitude,
+            available: wp.available,
+            preferences: workerPreferences,
+          },
+          {
+            requiredSkills: (data.required_skills ?? []).map((s: any) => ({
+              skillId: s.skill_id,
+              importance: s.importance,
+              weight: s.weight,
+            })),
+            municipalityId: data.municipality_id,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            employmentType: data.employment_type,
+            workSchedules: data.work_schedules ?? [],
+            workArrangements: data.work_arrangements ?? [],
+            startDate: data.start_date,
+          }
+        )
+      
+        job.match = {
+          score: m.score,
+          grade: m.grade,
+          breakdown: m.breakdown,
+        }
+      
+        const { data: app } = await supabase
+          .from('job_applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', wp.id)
+          .maybeSingle()
+      
+        job.applied = !!app
+      }
   }
   return job
 }
@@ -436,11 +497,61 @@ export async function applyToJob(jobId: string, message?: string | null): Promis
   const userId = await uid()
   const { data: wp } = await supabase.from('worker_profiles').select('id, municipality_id, latitude, longitude, available, skills:worker_skills(skill_id, level, experience_level, verified_job_count)').eq('account_id', userId).maybeSingle()
   if (!wp) throw new ApiError('Worker profile missing.', 400)
-  const { data: jobRow } = await supabase.from('jobs').select('*, required_skills:job_required_skills(skill_id, importance, weight), municipality:municipalities(name), employer:employer_profiles!employer_profiles_account_id_fkey(business_name, verification)').eq('id', jobId).maybeSingle()
+    const { data: jobRow, error: jobError } = await supabase
+  .from('jobs')
+  .select(`
+    *,
+    required_skills:job_required_skills(skill_id, importance, weight),
+    municipality:municipalities(name),
+    employer:accounts!jobs_employer_id_fkey(
+      employer_profile:employer_profiles!employer_profiles_account_id_fkey(
+        business_name,
+        verification
+      )
+    )
+  `)
+  .eq('id', jobId)
+  .maybeSingle()
+
+if (jobError) {
+  throw new ApiError(jobError.message)
+}
+
+if (!jobRow) {
+  throw new ApiError('Job not found.', 404)
+}
   if (!jobRow) throw new ApiError('Job not found.', 404)
-  const match = computeMatch(
-    { skills: (wp.skills ?? []).map((s: any) => ({ skillId: s.skill_id, level: s.level, experienceLevel: s.experience_level, verifiedJobCount: s.verified_job_count })), municipalityId: wp.municipality_id, latitude: wp.latitude, longitude: wp.longitude, available: wp.available },
-    { requiredSkills: (jobRow.required_skills ?? []).map((s: any) => ({ skillId: s.skill_id, importance: s.importance, weight: s.weight })), municipalityId: jobRow.municipality_id, latitude: jobRow.latitude, longitude: jobRow.longitude }
+
+    const workerPreferences = await getPreferencesForWorkerId(wp.id)
+    
+    const match = computeMatch(
+    {
+      skills: (wp.skills ?? []).map((s: any) => ({
+        skillId: s.skill_id,
+        level: s.level,
+        experienceLevel: s.experience_level,
+        verifiedJobCount: s.verified_job_count,
+      })),
+      municipalityId: wp.municipality_id,
+      latitude: wp.latitude,
+      longitude: wp.longitude,
+      available: wp.available,
+      preferences: workerPreferences,
+    },
+    {
+      requiredSkills: (jobRow.required_skills ?? []).map((s: any) => ({
+        skillId: s.skill_id,
+        importance: s.importance,
+        weight: s.weight,
+      })),
+      municipalityId: jobRow.municipality_id,
+      latitude: jobRow.latitude,
+      longitude: jobRow.longitude,
+      employmentType: jobRow.employment_type,
+      workSchedules: jobRow.work_schedules ?? [],
+      workArrangements: jobRow.work_arrangements ?? [],
+      startDate: jobRow.start_date,
+    }
   )
   const { data, error } = await supabase.rpc('apply_to_job', {
     p_job_id: jobId,
@@ -452,7 +563,13 @@ export async function applyToJob(jobId: string, message?: string | null): Promis
     if (error.code === '23505') throw new ApiError('You have already applied to this job.', 409)
     throw new ApiError(error.message)
   }
-  const employer = Array.isArray(jobRow.employer) ? jobRow.employer[0] : jobRow.employer
+  const employerAccount = jobRow.employer
+
+  const employerProfiles = employerAccount?.employer_profile
+  
+  const employer = Array.isArray(employerProfiles)
+    ? employerProfiles[0]
+    : employerProfiles
   return {
     id: data.id, jobId, jobTitle: jobRow.title, jobCategory: jobRow.category,
     employerName: employer?.business_name ?? 'Employer', employerVerification: employer?.verification ?? 'unverified',
@@ -584,6 +701,11 @@ export async function getEmployment(employmentId: string): Promise<EmploymentDet
     supabase.from('daily_accomplishments').select('*, photos:accomplishment_photos(id, url)').eq('employment_id', employmentId).order('work_date', { ascending: false }),
     supabase.from('employment_evaluations').select('*').eq('employment_id', employmentId),
   ])
+
+  assertError(renewals.error, 'Failed to load renewal requests.')
+  assertError(accs.error, 'Failed to load accomplishment reports.')
+  assertError(evals.error, 'Failed to load employment evaluations.')
+  
   return {
     ...base,
     renewals: (renewals.data ?? []).map((r) => ({
@@ -603,26 +725,14 @@ export async function getEmployment(employmentId: string): Promise<EmploymentDet
   }
 }
 
-export async function updateEmployment(
-  employmentId: string,
-  payload: { status?: string; end_date?: string | null }
+export async function completeEmployment(
+  employmentId: string
 ): Promise<EmploymentDetailDTO> {
-  const update: Record<string, any> = {}
+  const { error } = await supabase.rpc('complete_employment', {
+    p_employment_id: employmentId,
+  })
 
-  if (payload.status !== undefined) {
-    update.status = payload.status
-  }
-
-  if (payload.end_date !== undefined) {
-    update.end_date = payload.end_date
-  }
-
-  const { error } = await supabase
-    .from('employments')
-    .update(update)
-    .eq('id', employmentId)
-
-  assertError(error, 'Failed to update employment.')
+  assertError(error, 'Failed to complete employment.')
 
   return getEmployment(employmentId)
 }
@@ -1013,7 +1123,311 @@ export async function updateWorkerMe(payload: Partial<{ fullName: string; mobile
   return getWorkerProfile()
 }
 
+// ---------------------------------------------------------------------------
+// Worker work preferences
+// ---------------------------------------------------------------------------
 
+function mapWorkerWorkPreferences(
+  row: any
+): WorkerWorkPreferencesDTO {
+  return {
+    id: row.id,
+    workerId: row.worker_id,
+    employmentTypes: row.employment_types ?? [],
+    workSchedules: row.work_schedules ?? [],
+    workArrangements: row.work_arrangements ?? [],
+    earliestStartDate: row.earliest_start_date ?? null,
+    willingToRelocate: row.willing_to_relocate ?? null,
+    willingToLiveIn: row.willing_to_live_in ?? null,
+    expectedMinCompensation:
+      row.expected_min_compensation === null
+        ? null
+        : Number(row.expected_min_compensation),
+    compensationType: row.compensation_type ?? null,
+  }
+}
+
+export async function getWorkerWorkPreferences():
+Promise<WorkerWorkPreferencesDTO | null> {
+  const userId = await uid()
+
+  const { data: worker, error: workerError } = await supabase
+    .from('worker_profiles')
+    .select('id')
+    .eq('account_id', userId)
+    .maybeSingle()
+
+  assertError(workerError, 'Failed to identify worker profile.')
+
+  if (!worker) {
+    throw new ApiError('Worker profile missing.', 400)
+  }
+
+  const { data, error } = await supabase
+    .from('worker_work_preferences')
+    .select('*')
+    .eq('worker_id', worker.id)
+    .maybeSingle()
+
+  assertError(error, 'Failed to load work preferences.')
+
+  return data ? mapWorkerWorkPreferences(data) : null
+}
+
+export async function getEmployerWorkerWorkPreferences(
+  workerId: string
+): Promise<WorkerWorkPreferencesDTO | null> {
+  await uid()
+
+  const { data, error } = await supabase
+    .from('worker_work_preferences')
+    .select('*')
+    .eq('worker_id', workerId)
+    .maybeSingle()
+
+  assertError(error, 'Failed to load applicant work preferences.')
+
+  return data ? mapWorkerWorkPreferences(data) : null
+}
+
+export async function saveWorkerWorkPreferences(
+  payload: WorkerWorkPreferencesInput
+): Promise<WorkerWorkPreferencesDTO> {
+  const userId = await uid()
+
+  const { data: worker, error: workerError } = await supabase
+    .from('worker_profiles')
+    .select('id')
+    .eq('account_id', userId)
+    .maybeSingle()
+
+  assertError(workerError, 'Failed to identify worker profile.')
+
+  if (!worker) {
+    throw new ApiError('Worker profile missing.', 400)
+  }
+
+  const expectedCompensation =
+    payload.expectedMinCompensation ?? null
+
+  const compensationType =
+    expectedCompensation === null
+      ? null
+      : payload.compensationType ?? null
+
+  if (
+    expectedCompensation !== null &&
+    (!Number.isFinite(expectedCompensation) ||
+      expectedCompensation < 0)
+  ) {
+    throw new ApiError('Please enter a valid expected compensation.')
+  }
+
+  if (
+    expectedCompensation !== null &&
+    !compensationType
+  ) {
+    throw new ApiError('Please select a compensation type.')
+  }
+
+  const record = {
+    worker_id: worker.id,
+    employment_types: payload.employmentTypes,
+    work_schedules: payload.workSchedules,
+    work_arrangements: payload.workArrangements,
+    earliest_start_date: payload.earliestStartDate || null,
+    willing_to_relocate: payload.willingToRelocate ?? null,
+    willing_to_live_in: payload.willingToLiveIn ?? null,
+    expected_min_compensation: expectedCompensation,
+    compensation_type: compensationType,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase
+    .from('worker_work_preferences')
+    .upsert(record, { onConflict: 'worker_id' })
+    .select('*')
+    .single()
+
+  assertError(error, 'Failed to save work preferences.')
+
+  return mapWorkerWorkPreferences(data)
+}
+
+// ---------------------------------------------------------------------------
+// Worker work history
+// ---------------------------------------------------------------------------
+
+export type WorkerWorkHistoryInput = {
+  id?: string
+  jobTitle: string
+  employerName?: string | null
+  employerType?: string | null
+  startDate: string
+  endDate?: string | null
+  isCurrent: boolean
+  description?: string | null
+  tasks: string[]
+  referenceName?: string | null
+  referenceContact?: string | null
+}
+
+function mapWorkerWorkHistory(row: any): WorkerWorkHistoryDTO {
+  return {
+    id: row.id,
+    workerId: row.worker_id,
+    jobTitle: row.job_title,
+    employerName: row.employer_name ?? null,
+    employerType: row.employer_type ?? null,
+    startDate: row.start_date,
+    endDate: row.end_date ?? null,
+    isCurrent: row.is_current,
+    description: row.description ?? null,
+    tasks: row.tasks ?? [],
+    referenceName: row.reference_name ?? null,
+    referenceContact: row.reference_contact ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+async function getOwnWorkerProfileId(): Promise<string> {
+  const userId = await uid()
+
+  const { data, error } = await supabase
+    .from('worker_profiles')
+    .select('id')
+    .eq('account_id', userId)
+    .single()
+
+  assertError(error, 'Failed to find your worker profile.')
+
+  if (!data) {
+    throw new ApiError('Worker profile not found.', 404)
+  }
+
+  return data.id
+}
+
+export async function listWorkerWorkHistory(): Promise<WorkerWorkHistoryDTO[]> {
+  const workerId = await getOwnWorkerProfileId()
+
+  const { data, error } = await supabase
+    .from('worker_work_history')
+    .select('*')
+    .eq('worker_id', workerId)
+    .order('start_date', { ascending: false })
+
+  assertError(error, 'Failed to load your work history.')
+
+  return (data ?? []).map(mapWorkerWorkHistory)
+}
+
+export async function saveWorkerWorkHistory(
+  payload: WorkerWorkHistoryInput
+): Promise<WorkerWorkHistoryDTO> {
+  const workerId = await getOwnWorkerProfileId()
+  const jobTitle = payload.jobTitle.trim()
+
+  if (jobTitle.length < 2 || jobTitle.length > 150) {
+    throw new ApiError('Job title must be between 2 and 150 characters.')
+  }
+
+  if (!payload.startDate) {
+    throw new ApiError('Please provide a start date.')
+  }
+
+  if (
+    !payload.isCurrent &&
+    payload.endDate &&
+    payload.endDate < payload.startDate
+  ) {
+    throw new ApiError('End date cannot be earlier than start date.')
+  }
+
+  const cleanTasks = [...new Set(
+    (payload.tasks ?? [])
+      .map((task) => task.trim())
+      .filter(Boolean)
+  )]
+
+  const values = {
+    job_title: jobTitle,
+    employer_name: payload.employerName?.trim() || null,
+    employer_type: payload.employerType || null,
+    start_date: payload.startDate,
+    end_date: payload.isCurrent ? null : payload.endDate || null,
+    is_current: payload.isCurrent,
+    description: payload.description?.trim() || null,
+    tasks: cleanTasks,
+    reference_name: payload.referenceName?.trim() || null,
+    reference_contact: payload.referenceContact?.trim() || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  let query
+
+  if (payload.id) {
+    query = supabase
+      .from('worker_work_history')
+      .update(values)
+      .eq('id', payload.id)
+      .eq('worker_id', workerId)
+  } else {
+    query = supabase
+      .from('worker_work_history')
+      .insert({
+        ...values,
+        worker_id: workerId,
+      })
+  }
+
+  const { data, error } = await query.select('*').single()
+
+  assertError(error, 'Failed to save work history.')
+
+  if (!data) {
+    throw new ApiError('The work history record could not be saved.')
+  }
+
+  return mapWorkerWorkHistory(data)
+}
+
+export async function deleteWorkerWorkHistory(id: string): Promise<void> {
+  const workerId = await getOwnWorkerProfileId()
+
+  const { error } = await supabase
+    .from('worker_work_history')
+    .delete()
+    .eq('id', id)
+    .eq('worker_id', workerId)
+
+  assertError(error, 'Failed to delete work history.')
+}
+
+/**
+ * Employer-facing records come from the restricted view.
+ * Reference name and contact are intentionally not selected.
+ */
+export async function listEmployerWorkerWorkHistory(
+  workerId: string
+): Promise<WorkerWorkHistoryDTO[]> {
+  await uid()
+
+  const { data, error } = await supabase
+    .from('employer_worker_work_history')
+    .select('*')
+    .eq('worker_id', workerId)
+    .order('start_date', { ascending: false })
+
+  assertError(error, 'Failed to load applicant work experience.')
+
+  return (data ?? []).map((row: any) => ({
+    ...mapWorkerWorkHistory(row),
+    referenceName: null,
+    referenceContact: null,
+  }))
+}
 // ---------------------------------------------------------------------------
 // Worker skill tasks
 // ---------------------------------------------------------------------------
