@@ -12,6 +12,9 @@
         </CardContent>
       </Card>
 
+      <!-- Language settings -->
+<LanguageSelector />
+
       <!-- Description card -->
       <Card>
         <CardContent class="p-4 space-y-3">
@@ -70,11 +73,14 @@ import {
   IonIcon,
   IonButton
 } from '@ionic/vue'
+
+import LanguageSelector from '../shared/LanguageSelector.vue'
 import { 
   AppShell, 
   Card,
   CardContent
 } from '../worker/_ui'
+
 
 interface GuestAccountProps {
   onAuth: (mode: 'login' | 'register', role: 'worker' | 'employer') => void

@@ -19,6 +19,9 @@
         </div>
       </div>
 
+      <!-- Language settings -->
+<LanguageSelector />
+
       <ErrorRetry v-if="meError" :message="meError" @retry="refreshMe" />
 
       <div
@@ -115,6 +118,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+
+import LanguageSelector from '../shared/LanguageSelector.vue'
 
 import {
   createReport,

@@ -6,8 +6,10 @@
 
     <template v-else-if="view === 'notifications'">
       <AppShell
-        title="Notifications"
-        :subtitle="unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'"
+        :title="t('admin.notifications')"
+        :subtitle="unreadCount > 0
+          ? t('admin.unreadCount', { count: unreadCount })
+          : t('admin.allCaughtUp')"
         :back="true"
         @back="view = null"
       >
@@ -17,7 +19,10 @@
 
         <PullRefresh :refreshing="notifLoading" @refresh="refreshNotifications">
           <div class="tl-between mb-3">
-            <p class="text-xs text-muted-foreground">Tap a notification to mark it read.</p>
+            <p class="text-xs text-muted-foreground">
+              {{ t('admin.tapNotification') }}
+            </p>
+
             <button
               type="button"
               class="tl-btn outline sm"
@@ -28,18 +33,25 @@
                 :icon="markingAll ? Icons.Loader2 : Icons.CheckCircle2"
                 :class="{ 'tl-spin': markingAll }"
               />
-              Mark all read
+              {{ t('admin.markAllRead') }}
             </button>
           </div>
 
           <LoadingCards v-if="notifLoading" :count="4" />
-          <ErrorRetry v-else-if="notifError" :message="notifError ?? ''" @retry="refreshNotifications" />
+
+          <ErrorRetry
+            v-else-if="notifError"
+            :message="notifError ?? ''"
+            @retry="refreshNotifications"
+          />
+
           <EmptyState
             v-else-if="!notifications || notifications.length === 0"
             :icon="Icons.BellRing"
-            title="No notifications"
-            description="Updates about reports and moderation will appear here."
+            :title="t('admin.noNotifications')"
+            :description="t('admin.notificationDescription')"
           />
+
           <div v-else class="tl-list">
             <button
               v-for="n in notifications"
@@ -57,14 +69,24 @@
                     n.type === 'report_update' ? 'text-emerald-600' : 'text-muted-foreground',
                   ]"
                 />
+
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <p class="font-medium text-sm truncate">{{ n.title }}</p>
-                    <span v-if="!n.read" class="tl-pill approved">New</span>
+                    <span v-if="!n.read" class="tl-pill approved">
+                      {{ t('admin.new') }}
+                    </span>
                   </div>
-                  <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">{{ n.body }}</p>
-                  <p class="text-[11px] text-muted-foreground mt-1">{{ relativeTime(n.createdAt) }}</p>
+
+                  <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                    {{ n.body }}
+                  </p>
+
+                  <p class="text-[11px] text-muted-foreground mt-1">
+                    {{ relativeTime(n.createdAt) }}
+                  </p>
                 </div>
+
                 <IonIcon
                   v-if="markingId === n.id"
                   :icon="Icons.Loader2"
@@ -83,21 +105,25 @@
         @open-reports="tab = 'reports'"
         @open-audit="view = 'audit'"
       />
+
       <AdminReports
         v-else-if="tab === 'reports'"
         :key="`reports-${version}`"
         @open-report="reportSheet = $event"
       />
+
       <AdminJobModeration
         v-else-if="tab === 'jobs'"
         :key="`jobs-${version}`"
         @open-job="jobSheet = $event"
       />
+
       <AdminUsers
         v-else-if="tab === 'users'"
         :key="`users-${version}`"
         @open-user="userSheet = $event"
       />
+
       <AdminAccount
         v-else-if="tab === 'account'"
         :unread-notifications="unreadCount"
@@ -112,12 +138,14 @@
       @view-user="userSheet = $event"
       @view-job="jobSheet = $event"
     />
+
     <AdminUserDetails
       :user-id="userSheet"
       @close="userSheet = null"
       @updated="onSheetUpdated"
       @view-job="jobSheet = $event"
     />
+
     <AdminJobDetails
       :job-id="jobSheet"
       @close="jobSheet = null"
@@ -132,6 +160,7 @@
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   AppShell,
@@ -144,6 +173,7 @@ import {
   RefreshHeader,
   type TabItem,
 } from '../worker/_ui'
+
 import {
   adminOverview,
   listNotifications,
@@ -170,6 +200,9 @@ import AdminUsers from './AdminUsers.vue'
 type TabKey = 'overview' | 'reports' | 'jobs' | 'users' | 'account'
 type SubView = 'audit' | 'notifications' | null
 
+// Global English/Filipino translations
+const { t } = useI18n({ useScope: 'global' })
+
 const { toast } = useToast()
 
 const tab = ref<TabKey>('overview')
@@ -194,28 +227,57 @@ const {
 } = useAsync<NotificationDTO[]>(() => listNotifications(), [])
 
 const pendingReports = computed(() => overview.value?.pendingReports ?? 0)
-const unreadCount = computed(() => (notifications.value ?? []).filter((n) => !n.read).length)
+
+const unreadCount = computed(
+  () => (notifications.value ?? []).filter((n) => !n.read).length
+)
 
 const markingAll = ref(false)
 const markingId = ref<string | null>(null)
 
+// Admin navigation with global language support
 const tabs = computed<TabItem[]>(() => [
-  { key: 'overview', label: 'Overview', icon: Icons.Home },
-  { key: 'reports', label: 'Reports', icon: Icons.FileWarning, badge: pendingReports.value },
-  { key: 'jobs', label: 'Jobs', icon: Icons.Briefcase },
-  { key: 'users', label: 'Users', icon: Icons.Users },
-  { key: 'account', label: 'Account', icon: Icons.User, badge: unreadCount.value },
+  {
+    key: 'overview',
+    label: t('common.overview'),
+    icon: Icons.Home,
+  },
+  {
+    key: 'reports',
+    label: t('common.reports'),
+    icon: Icons.FileWarning,
+    badge: pendingReports.value,
+  },
+  {
+    key: 'jobs',
+    label: t('common.jobs'),
+    icon: Icons.Briefcase,
+  },
+  {
+    key: 'users',
+    label: t('common.users'),
+    icon: Icons.Users,
+  },
+  {
+    key: 'account',
+    label: t('common.account'),
+    icon: Icons.User,
+    badge: unreadCount.value,
+  },
 ])
 
 let notifTimer: ReturnType<typeof setTimeout> | undefined
+
 watch(view, (next) => {
   if (next !== 'notifications') {
     if (notifTimer) clearTimeout(notifTimer)
+
     notifTimer = setTimeout(() => {
       void refreshNotifications()
     }, 800)
   }
 })
+
 onUnmounted(() => {
   if (notifTimer) clearTimeout(notifTimer)
 })
@@ -242,13 +304,21 @@ function onReportUpdated(): void {
 
 async function markOne(n: NotificationDTO): Promise<void> {
   if (n.read || markingId.value) return
+
   markingId.value = n.id
+
   try {
     await markNotificationRead(n.id)
-    setNotifications((notifications.value ?? []).map((x) => (x.id === n.id ? { ...x, read: true } : x)))
-    toast('Marked as read.', 'success')
+
+    setNotifications(
+      (notifications.value ?? []).map((x) =>
+        x.id === n.id ? { ...x, read: true } : x
+      )
+    )
+
+    toast(t('admin.markedAsRead'), 'success')
   } catch (e: any) {
-    toast(e?.message || 'Could not mark as read.', 'danger')
+    toast(e?.message || t('admin.couldNotMarkRead'), 'danger')
   } finally {
     markingId.value = null
   }
@@ -256,13 +326,19 @@ async function markOne(n: NotificationDTO): Promise<void> {
 
 async function markAll(): Promise<void> {
   if (markingAll.value || unreadCount.value === 0) return
+
   markingAll.value = true
+
   try {
     await markAllNotificationsRead()
-    setNotifications((notifications.value ?? []).map((x) => ({ ...x, read: true })))
-    toast('All caught up — marked everything as read.', 'success')
+
+    setNotifications(
+      (notifications.value ?? []).map((x) => ({ ...x, read: true }))
+    )
+
+    toast(t('admin.allMarkedRead'), 'success')
   } catch (e: any) {
-    toast(e?.message || 'Could not mark all as read.', 'danger')
+    toast(e?.message || t('admin.couldNotMarkAllRead'), 'danger')
   } finally {
     markingAll.value = false
   }

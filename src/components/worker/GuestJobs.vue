@@ -1,21 +1,28 @@
+
 <template>
   <AppShell
-    title="Jobs"
-    subtitle="Skills. Opportunities. Local Progress."
+    :title="t('guestJobs.title')"
+    :subtitle="t('guestJobs.subtitle')"
     :right="refreshHeader"
   >
     <PullRefresh @refresh="refresh" :refreshing="loading">
       <div class="space-y-3">
         <!-- Search -->
         <div class="relative">
-          <IonIcon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <IonIcon
+            name="search"
+            class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+          />
+
           <IonInput
             v-model="q"
-            placeholder="Search jobs, skills, employers…"
+            :placeholder="t('guestJobs.searchPlaceholder')"
             class="pr-9"
           />
-          <button 
-            v-if="q" 
+
+          <button
+            v-if="q"
+            type="button"
             @click="q = ''"
             class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
           >
@@ -24,17 +31,21 @@
         </div>
 
         <!-- Active filters -->
-        <div v-if="category || municipalityId" class="flex flex-wrap gap-1.5">
-          <StatusPill 
-            v-if="category" 
-            :status="category" 
+        <div
+          v-if="category || municipalityId"
+          class="flex flex-wrap gap-1.5"
+        >
+          <StatusPill
+            v-if="category"
+            :status="category"
             @click="category = ''"
             closable
           >
             {{ labelFor(category, JOB_CATEGORIES) }}
           </StatusPill>
-          <StatusPill 
-            v-if="municipalityId" 
+
+          <StatusPill
+            v-if="municipalityId"
             :status="municipalities.find(m => m.id === municipalityId)?.name || municipalityId"
             @click="municipalityId = ''"
             closable
@@ -47,16 +58,19 @@
         <div v-if="loading">
           <LoadingCards :count="3" />
         </div>
+
         <div v-else-if="error">
           <ErrorRetry :message="error" @retry="refresh" />
         </div>
+
         <div v-else-if="!data || data.length === 0">
           <EmptyState
             icon="briefcase"
-            title="No jobs found"
-            description="Try adjusting your search or filters."
+            :title="t('guestJobs.noJobs')"
+            :description="t('guestJobs.adjustSearch')"
           />
         </div>
+
         <div v-else class="space-y-3">
           <JobCard
             v-for="job in data"
@@ -69,39 +83,54 @@
     </PullRefresh>
 
     <!-- Filters sheet -->
-    <ion-modal 
-      :is-open="showFilters" 
+    <ion-modal
+      :is-open="showFilters"
       @will-dismiss="showFilters = false"
       :breakpoints="[0, 0.75, 1]"
       :initial-breakpoint="0.75"
     >
       <ion-header>
         <ion-toolbar>
-          <ion-title>Filters</ion-title>
+          <ion-title>{{ t('guestJobs.filters') }}</ion-title>
         </ion-toolbar>
       </ion-header>
+
       <ion-content class="ion-padding">
         <div class="space-y-4">
-          <Field label="Category">
-            <FormSelect 
-              :value="category" 
+          <Field :label="t('guestJobs.category')">
+            <FormSelect
+              :value="category"
               @update:value="category = $event"
-              :options="[{ value: '', label: 'All categories' }, ...JOB_CATEGORIES.map(c => ({ value: c.value, label: c.label }))]"
+              :options="[
+                { value: '', label: t('guestJobs.allCategories') },
+                ...JOB_CATEGORIES.map(c => ({
+                  value: c.value,
+                  label: c.label
+                }))
+              ]"
             />
           </Field>
-          <Field label="Municipality">
-            <FormSelect 
-              :value="municipalityId" 
+
+          <Field :label="t('guestJobs.municipality')">
+            <FormSelect
+              :value="municipalityId"
               @update:value="municipalityId = $event"
-              :options="[{ value: '', label: 'All municipalities' }, ...municipalities.map(m => ({ value: m.id, label: m.name }))]"
+              :options="[
+                { value: '', label: t('guestJobs.allMunicipalities') },
+                ...municipalities.map(m => ({
+                  value: m.id,
+                  label: m.name
+                }))
+              ]"
             />
           </Field>
         </div>
       </ion-content>
+
       <ion-footer>
         <div class="ion-padding">
           <IonButton @click="showFilters = false">
-            Show jobs
+            {{ t('guestJobs.showJobs') }}
           </IonButton>
         </div>
       </ion-footer>
@@ -119,45 +148,61 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { 
+import { useI18n } from 'vue-i18n'
+
+import {
   IonModal,
   IonIcon,
   IonInput,
   IonButton
 } from '@ionic/vue'
-import { 
-  AppShell, 
-  Field, 
-  FormSelect, 
-  LoadingCards, 
-  ErrorRetry, 
-  EmptyState, 
+
+import {
+  AppShell,
+  Field,
+  FormSelect,
+  LoadingCards,
+  ErrorRetry,
+  EmptyState,
   PullRefresh,
   JobCard,
   StatusPill,
   JobDetailSheet
 } from '../worker/_ui'
-import { 
-  listJobs, 
+
+import {
+  listJobs,
   getMunicipalities
 } from '../worker/_lib'
-import { type JobDTO, type MunicipalityDTO } from '../worker/_lib'
-import { JOB_CATEGORIES, labelFor } from '../worker/_lib'
+
+import {
+  type JobDTO,
+  type MunicipalityDTO
+} from '../worker/_lib'
+
+import {
+  JOB_CATEGORIES,
+  labelFor
+} from '../worker/_lib'
 
 interface GuestJobsProps {
   onApply: (job: JobDTO) => void
 }
 
 defineProps<GuestJobsProps>()
+
 const emit = defineEmits<{
   apply: [job: JobDTO]
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
 
 const q = ref('')
 const category = ref('')
 const municipalityId = ref('')
 const showFilters = ref(false)
 const selectedJob = ref<JobDTO | null>(null)
+
 const data = ref<JobDTO[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -183,20 +228,20 @@ onMounted(async () => {
 const refresh = async () => {
   loading.value = true
   error.value = null
-  
+
   try {
     const params: any = {
       limit: 30
     }
-    
+
     if (q.value) params.q = q.value
     if (category.value) params.category = category.value
     if (municipalityId.value) params.municipalityId = municipalityId.value
-    
+
     const res = await listJobs(params)
     data.value = res.data
   } catch (e: any) {
-    error.value = e?.message || 'Failed to load jobs.'
+    error.value = e?.message || t('guestJobs.loadFailed')
   } finally {
     loading.value = false
   }

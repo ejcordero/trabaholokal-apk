@@ -1,3 +1,4 @@
+
 <template>
   <div class="tl-shell" style="height: 100dvh">
     <div class="flex-1 min-h-0" style="min-height: 0">
@@ -68,6 +69,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   listNotifications,
@@ -76,6 +78,7 @@ import {
   type JobWithMatch,
   type NotificationDTO,
 } from '../worker/_lib'
+
 import { BottomTabs, Icons, type TabItem } from '../worker/_ui'
 
 import EmployerAccount from './EmployerAccount.vue'
@@ -104,6 +107,9 @@ type SubView =
   | { name: 'employment-details'; employmentId: string }
   | { name: 'shortlist' }
 
+// Global language translations
+const { t } = useI18n({ useScope: 'global' })
+
 const tab = ref<TabKey>('home')
 const view = ref<SubView | null>(null)
 const applicantSheet = ref<ApplicationDTO | null>(null)
@@ -112,20 +118,35 @@ const { data: notifData, refresh: refreshNotifs } = useAsync<NotificationDTO[]>(
   () => listNotifications(),
   []
 )
-const unreadCount = computed(() => (notifData.value ?? []).filter((n) => !n.read).length)
 
-const jobFormId = computed(() => (view.value?.name === 'job-form' ? view.value.jobId ?? '' : ''))
-const jobDetailsId = computed(() => (view.value?.name === 'job-details' ? view.value.jobId : ''))
+const unreadCount = computed(
+  () => (notifData.value ?? []).filter((n) => !n.read).length
+)
+
+const jobFormId = computed(() =>
+  view.value?.name === 'job-form' ? view.value.jobId ?? '' : ''
+)
+
+const jobDetailsId = computed(() =>
+  view.value?.name === 'job-details' ? view.value.jobId : ''
+)
+
 const employmentDetailsId = computed(() =>
   view.value?.name === 'employment-details' ? view.value.employmentId : ''
 )
 
+// Employer navigation with global language support
 const tabs = computed<TabItem[]>(() => [
-  { key: 'home', label: 'Dashboard', icon: Icons.Home },
-  { key: 'jobs', label: 'My Jobs', icon: Icons.Briefcase },
-  { key: 'applicants', label: 'Applicants', icon: Icons.Users },
-  { key: 'workforce', label: 'Workforce', icon: Icons.BriefcaseBusiness },
-  { key: 'account', label: 'Account', icon: Icons.User, badge: unreadCount.value },
+  { key: 'home', label: t('common.dashboard'), icon: Icons.Home },
+  { key: 'jobs', label: t('common.myJobs'), icon: Icons.Briefcase },
+  { key: 'applicants', label: t('common.applicants'), icon: Icons.Users },
+  { key: 'workforce', label: t('common.workforce'), icon: Icons.BriefcaseBusiness },
+  {
+    key: 'account',
+    label: t('common.account'),
+    icon: Icons.User,
+    badge: unreadCount.value,
+  },
 ])
 
 function goTab(next: string) {
@@ -151,7 +172,9 @@ function onAccountNavigate(name: string) {
 }
 
 function openJobForm(jobId?: string) {
-  view.value = jobId ? { name: 'job-form', jobId } : { name: 'job-form' }
+  view.value = jobId
+    ? { name: 'job-form', jobId }
+    : { name: 'job-form' }
 }
 
 function openJobDetails(id: string) {

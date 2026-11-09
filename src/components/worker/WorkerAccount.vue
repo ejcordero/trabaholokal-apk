@@ -22,6 +22,9 @@
           </CardContent>
         </Card>
 
+        <!-- Language settings -->
+<LanguageSelector />
+
         <!-- Online indicator -->
         <div
           :class="[
@@ -301,6 +304,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+import LanguageSelector from '../shared/LanguageSelector.vue'
 import type { OfflineApplication } from '../worker/_lib'
 
 import {

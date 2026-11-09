@@ -18,6 +18,9 @@
         </div>
       </div>
 
+      <!-- Language settings -->
+<LanguageSelector />
+
       <SectionTitle>Moderation</SectionTitle>
       <div class="tl-list">
         <button type="button" class="tl-card clickable link-row" @click="emit('navigate', 'notifications')">
@@ -131,6 +134,8 @@
 
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue'
+
+import LanguageSelector from '../shared/LanguageSelector.vue'
 import { ref } from 'vue'
 
 import {

@@ -1,4 +1,5 @@
 import { IonIcon, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue'
+import { useI18n } from 'vue-i18n'
 import {
   addOutline,
   alertCircleOutline,
@@ -1029,6 +1030,7 @@ export const ProgressBar = defineComponent({
   },
 })
 
+
 export const JobCard = defineComponent({
   name: 'JobCard',
   props: {
@@ -1036,59 +1038,108 @@ export const JobCard = defineComponent({
     match: { type: Object as PropType<{ score: number; grade?: string } | null>, default: null },
   },
   emits: ['open'],
-  setup(props, { emit }) {
-    return () => {
-      const job = props.job
-      return h('div', { class: 'tl-card clickable', onClick: () => {
-        console.log('[JobCard] Clicked:', job.id)
-        emit('open', job.id)
-      }}, [
+ 
+setup(props, { emit }) {
+  const { t } = useI18n({ useScope: 'global' })
+  
+  return () => {
+    const job = props.job
+
+      return h('div', {
+        class: 'tl-card clickable',
+        onClick: () => {
+          console.log('[JobCard] Clicked:', job.id)
+          emit('open', job.id)
+        },
+      }, [
         h('div', { class: 'tl-card-body' }, [
           h('div', { class: 'flex items-start justify-between gap-2' }, [
             h('div', { class: 'min-w-0 flex-1' }, [
               h('div', { class: 'flex items-center gap-1.5 flex-wrap' }, [
                 h(UrgencyTag, { level: job.urgencyLevel }),
-                h('span', { class: 'text-[11px] uppercase text-muted-foreground' },
-                  labelFor(job.category, JOB_CATEGORIES)),
+
+                h('span', {
+                  class: 'text-[11px] uppercase text-muted-foreground',
+                }, labelFor(job.category, JOB_CATEGORIES)),
+
                 job.preferredCategoryMatch
                   ? h('span', {
-                      class: 'text-[10px] font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5'
-                    }, 'Preferred category')
+                      class: 'text-[10px] font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5',
+                    }, t('jobCard.preferredCategory'))
                   : null,
               ]),
-              h('h3', { class: 'tl-card-title truncate mt-1' }, job.title),
-              h('p', { class: 'text-xs text-muted-foreground flex items-center gap-1 mt-0.5' }, [
+
+              h('h3', {
+                class: 'tl-card-title truncate mt-1',
+              }, job.title),
+
+              h('p', {
+                class: 'text-xs text-muted-foreground flex items-center gap-1 mt-0.5',
+              }, [
                 iconNode('Building2', 14),
                 h('span', { class: 'truncate' }, job.employerName),
-                h(VerifiedBadge, { verification: job.employerVerification }),
+                h(VerifiedBadge, {
+                  verification: job.employerVerification,
+                }),
               ]),
             ]),
-            props.match ? h(MatchRing, { score: props.match.score, size: 46 }) : null,
+
+            props.match
+              ? h(MatchRing, { score: props.match.score, size: 46 })
+              : null,
           ]),
-          h('div', { class: 'flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2' }, [
-            h('span', { class: 'inline-flex items-center gap-1' }, [
-              h(IonIcon, { icon: Icons.Wallet, style: { color: '#059669' } }),
+
+          h('div', {
+            class: 'flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2',
+          }, [
+            h('span', {
+              class: 'inline-flex items-center gap-1',
+            }, [
+              h(IonIcon, {
+                icon: Icons.Wallet,
+                style: { color: '#059669' },
+              }),
               h('span', formatCompensation(job.compensation, job.compensationType)),
             ]),
-            h('span', { class: 'inline-flex items-center gap-1' }, [
+
+            h('span', {
+              class: 'inline-flex items-center gap-1',
+            }, [
               iconNode('MapPin', 14),
-              h('span', `${job.municipalityName ?? job.barangay ?? 'Location N/A'}${job.distanceKm != null ? ` - ${job.distanceKm} km` : ''}`),
+              h('span',
+                `${job.municipalityName ?? job.barangay ?? 'Location N/A'}${job.distanceKm != null ? ` - ${job.distanceKm} km` : ''}`
+              ),
             ]),
-            h('span', { class: 'inline-flex items-center gap-1' }, [
+
+            h('span', {
+              class: 'inline-flex items-center gap-1',
+            }, [
               iconNode('Clock', 14),
               h('span', labelFor(job.employmentType, EMPLOYMENT_TYPES)),
             ]),
           ]),
+
           job.scamFlags.length
-            ? h('div', { class: 'text-xs text-amber-700 flex items-center gap-1 mt-2' }, [
+            ? h('div', {
+                class: 'text-xs text-amber-700 flex items-center gap-1 mt-2',
+              }, [
                 iconNode('FileWarning', 14),
-                h('span', 'Safety notice - review before applying'),
+                h('span', t('jobCard.safetyNotice')),
               ])
             : null,
+
           h('div', { class: 'tl-chip-row mt-2' }, [
-            ...job.requiredSkills.slice(0, 3).map((s) => h('span', { key: s.id, class: 'tl-chip' }, s.skillName)),
+            ...job.requiredSkills.slice(0, 3).map(skill =>
+              h('span', {
+                key: skill.id,
+                class: 'tl-chip',
+              }, skill.skillName)
+            ),
+
             job.requiredSkills.length > 3
-              ? h('span', { class: 'tl-caption' }, `+${job.requiredSkills.length - 3} more`)
+              ? h('span', {
+                  class: 'tl-caption',
+                }, `+${job.requiredSkills.length - 3} ${t('jobCard.moreSkills')}`)
               : null,
           ]),
         ]),
@@ -1096,6 +1147,7 @@ export const JobCard = defineComponent({
     }
   },
 })
+
 
 export const ApplicationCard = defineComponent({
   name: 'ApplicationCard',

@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSession } from '../worker/_lib'
 import { BottomTabs } from '../worker/_ui'
 import WorkerHome from './WorkerHome.vue'
@@ -73,6 +74,7 @@ interface WorkerAppProps {
 const props = defineProps<WorkerAppProps>()
 
 const { user } = useSession()
+const { t } = useI18n({ useScope: 'global' })
 const tab = ref<'home' | 'jobs' | 'applications' | 'work' | 'account'>('home')
 const handleTabChange = (
   nextTab: typeof tab.value
@@ -116,15 +118,15 @@ watch([view, tab], () => {
 })
 
 const tabs = computed(() => [
-  { key: 'home', label: 'Home', icon: 'home' },
-  { key: 'jobs', label: 'Jobs', icon: 'briefcase' },
-  { key: 'applications', label: 'Applications', icon: 'clipboard-list' },
-  { key: 'work', label: 'My Work', icon: 'briefcase-business' },
-  { 
-    key: 'account', 
-    label: 'Account', 
-    icon: 'user', 
-    badge: unreadCount.value 
+  { key: 'home', label: t('common.home'), icon: 'home' },
+  { key: 'jobs', label: t('common.jobs'), icon: 'briefcase' },
+  { key: 'applications', label: t('common.applications'), icon: 'clipboard-list' },
+  { key: 'work', label: t('common.myWork'), icon: 'briefcase-business' },
+  {
+    key: 'account',
+    label: t('common.account'),
+    icon: 'user',
+    badge: unreadCount.value
   },
 ])
 
