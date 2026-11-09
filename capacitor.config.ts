@@ -1,9 +1,22 @@
+
+/// <reference types="@capacitor/splash-screen" />
+
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'io.ionic.starter',
-  appName: 'finals-trabaholokal',
-  webDir: 'dist'
+  appName: 'TrabahoLokal',
+  webDir: 'dist',
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      launchFadeOutDuration: 250,
+      backgroundColor: '#F5F3EC',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_INSIDE',
+      showSpinner: false
+    }
+  }
 };
 
 export default config;

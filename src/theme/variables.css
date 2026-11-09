@@ -1,2 +1,303 @@
-/* For information on how to create your own theme, please refer to:
-http://ionicframework.com/docs/theming/ */
+
+/* =========================================================
+   TRABAHOLOKAL — GLOBAL DESIGN SYSTEM
+   Modern Soft UI + Subtle Claymorphism
+   Sage & Warm Neutral
+   ========================================================= */
+
+   :root {
+    color-scheme: light;
+  
+    /* Typography */
+    --tl-font-family:
+      Inter, "DM Sans", -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+  
+    /* Brand colors */
+    --tl-primary: #71866D;
+    --tl-primary-dark: #5E705A;
+    --tl-primary-light: #A8B9A0;
+    --tl-accent: #A8B9A0;
+  
+    /* Backgrounds */
+    --tl-background: #F5F3EC;
+    --tl-surface: #FFFFFF;
+    --tl-surface-soft: #E8E4D9;
+  
+    /* Text */
+    --tl-text: #343A35;
+    --tl-text-secondary: #737B73;
+    --tl-text-muted: #929990;
+
+    /* Compatibility aliases used by shared UI components */
+--tl-bg: var(--tl-background);
+--tl-card: var(--tl-surface);
+--tl-muted: var(--tl-text-secondary);
+
+/* Device safe-area spacing */
+--tl-safe-top: env(safe-area-inset-top, 0px);
+--tl-safe-bottom: env(safe-area-inset-bottom, 0px);
+  
+    /* Status colors */
+    --tl-success: #648A78;
+    --tl-warning: #D6A65D;
+    --tl-danger: #B96C65;
+    --tl-info: #718A9B;
+  
+    /* Borders */
+    --tl-border: #E3E3DA;
+    --tl-border-strong: #D4D7CD;
+  
+    /* Radius */
+    --tl-radius-sm: 8px;
+    --tl-radius-md: 12px;
+    --tl-radius-lg: 16px;
+    --tl-radius-xl: 20px;
+    --tl-radius-full: 999px;
+  
+    /* Shadows */
+    --tl-shadow-sm:
+      0 2px 6px rgba(52, 58, 53, 0.04);
+  
+    --tl-shadow-md:
+      0 5px 16px rgba(52, 58, 53, 0.06);
+  
+    --tl-shadow-lg:
+      0 10px 28px rgba(52, 58, 53, 0.08);
+  
+    /* Subtle Claymorphism */
+    --tl-clay-shadow:
+      5px 5px 12px rgba(52, 58, 53, 0.06),
+      -5px -5px 12px rgba(255, 255, 255, 0.75);
+  
+    /* Spacing */
+    --tl-space-1: 4px;
+    --tl-space-2: 8px;
+    --tl-space-3: 12px;
+    --tl-space-4: 16px;
+    --tl-space-5: 20px;
+    --tl-space-6: 24px;
+    --tl-space-8: 32px;
+  
+    /* Animation */
+    --tl-transition:
+      180ms ease-in-out;
+  
+    /* =======================================================
+       IONIC THEME VARIABLES
+       ======================================================= */
+  
+    --ion-font-family: var(--tl-font-family);
+  
+    --ion-background-color: var(--tl-background);
+    --ion-background-color-rgb: 245, 243, 236;
+  
+    --ion-text-color: var(--tl-text);
+    --ion-text-color-rgb: 52, 58, 53;
+  
+    --ion-card-background: var(--tl-surface);
+    --ion-item-background: var(--tl-surface);
+  
+    --ion-toolbar-background: var(--tl-surface);
+    --ion-toolbar-color: var(--tl-text);
+  
+    --ion-tab-bar-background: var(--tl-surface);
+    --ion-tab-bar-color: var(--tl-text-secondary);
+  
+    --ion-color-primary: #71866D;
+    --ion-color-primary-rgb: 113, 134, 109;
+    --ion-color-primary-contrast: #FFFFFF;
+    --ion-color-primary-contrast-rgb: 255, 255, 255;
+    --ion-color-primary-shade: #63765F;
+    --ion-color-primary-tint: #7F927B;
+  
+    --ion-color-secondary: #A8B9A0;
+    --ion-color-secondary-rgb: 168, 185, 160;
+    --ion-color-secondary-contrast: #343A35;
+    --ion-color-secondary-contrast-rgb: 52, 58, 53;
+    --ion-color-secondary-shade: #94A38D;
+    --ion-color-secondary-tint: #B2C1AB;
+  
+    --ion-color-success: #648A78;
+    --ion-color-success-rgb: 100, 138, 120;
+    --ion-color-success-contrast: #FFFFFF;
+    --ion-color-success-contrast-rgb: 255, 255, 255;
+    --ion-color-success-shade: #587968;
+    --ion-color-success-tint: #759786;
+  
+    --ion-color-warning: #D6A65D;
+    --ion-color-warning-rgb: 214, 166, 93;
+    --ion-color-warning-contrast: #343A35;
+    --ion-color-warning-contrast-rgb: 52, 58, 53;
+    --ion-color-warning-shade: #BC9252;
+    --ion-color-warning-tint: #DAB170;
+  
+    --ion-color-danger: #B96C65;
+    --ion-color-danger-rgb: 185, 108, 101;
+    --ion-color-danger-contrast: #FFFFFF;
+    --ion-color-danger-contrast-rgb: 255, 255, 255;
+    --ion-color-danger-shade: #A35F59;
+    --ion-color-danger-tint: #C17B75;
+  
+    --ion-color-medium: #737B73;
+    --ion-color-medium-rgb: 115, 123, 115;
+    --ion-color-medium-contrast: #FFFFFF;
+    --ion-color-medium-contrast-rgb: 255, 255, 255;
+    --ion-color-medium-shade: #656C65;
+    --ion-color-medium-tint: #818981;
+  
+    --ion-color-light: #F5F3EC;
+    --ion-color-light-rgb: 245, 243, 236;
+    --ion-color-light-contrast: #343A35;
+    --ion-color-light-contrast-rgb: 52, 58, 53;
+    --ion-color-light-shade: #D8D6D0;
+    --ion-color-light-tint: #F6F4EE;
+  
+    /* =======================================================
+       GLOBAL BASE STYLES
+       ======================================================= */
+  
+    font-family: var(--tl-font-family);
+  }
+  
+  html,
+  body,
+  ion-app {
+    font-family: var(--tl-font-family);
+    color: var(--tl-text);
+    background: var(--tl-background);
+  }
+  
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Ionic content */
+  ion-content {
+    --background: var(--tl-background);
+    --color: var(--tl-text);
+  }
+  
+  /* Toolbars */
+  ion-toolbar {
+    --background: var(--tl-surface);
+    --color: var(--tl-text);
+    --border-color: var(--tl-border);
+  }
+  
+  /* Cards */
+  ion-card {
+    --background: var(--tl-surface);
+    --color: var(--tl-text);
+  
+    border: 1px solid var(--tl-border);
+    border-radius: var(--tl-radius-lg);
+    box-shadow: var(--tl-shadow-sm);
+    margin: 12px;
+  }
+  
+  /* Buttons */
+  ion-button {
+    --border-radius: var(--tl-radius-md);
+    --box-shadow: none;
+  
+    font-weight: 600;
+    letter-spacing: 0;
+    min-height: 44px;
+    transition: var(--tl-transition);
+  }
+  
+  /* Inputs */
+  ion-input,
+  ion-textarea,
+  ion-select {
+    --highlight-color-focused: var(--tl-primary);
+    --highlight-color-valid: var(--tl-success);
+    --highlight-color-invalid: var(--tl-danger);
+    font-family: var(--tl-font-family);
+  }
+  
+  /* Form items */
+  ion-item {
+    --border-color: var(--tl-border);
+    --highlight-color-focused: var(--tl-primary);
+  }
+  
+  /* Tab navigation */
+  ion-tab-bar {
+    --background: var(--tl-surface);
+    --color: var(--tl-text-secondary);
+    --color-selected: var(--tl-primary);
+  
+    border-top: 1px solid var(--tl-border);
+  }
+  
+  /* =========================================================
+     REUSABLE TRABAHOLOKAL DESIGN CLASSES
+     ========================================================= */
+  
+  .tl-page {
+    min-height: 100%;
+    background: var(--tl-background);
+    color: var(--tl-text);
+    font-family: var(--tl-font-family);
+  }
+  
+  .tl-card {
+    background: var(--tl-surface);
+    border: 1px solid var(--tl-border);
+    border-radius: var(--tl-radius-lg);
+    box-shadow: var(--tl-shadow-sm);
+    transition:
+      box-shadow var(--tl-transition),
+      transform var(--tl-transition);
+  }
+  
+  .tl-card-interactive:hover {
+    box-shadow: var(--tl-shadow-md);
+    transform: translateY(-2px);
+  }
+  
+  .tl-clay-surface {
+    background: var(--tl-background);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: var(--tl-radius-lg);
+    box-shadow: var(--tl-clay-shadow);
+  }
+  
+  .tl-primary-button {
+    background: var(--tl-primary);
+    color: #FFFFFF;
+    border: none;
+    border-radius: var(--tl-radius-md);
+    font-weight: 600;
+    transition: var(--tl-transition);
+  }
+  
+  .tl-primary-button:hover {
+    background: var(--tl-primary-dark);
+  }
+  
+  .tl-muted-text {
+    color: var(--tl-text-secondary);
+  }
+  
+  .tl-focus-visible:focus-visible {
+    outline: 3px solid var(--tl-primary-light);
+    outline-offset: 3px;
+  }
+  
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+  

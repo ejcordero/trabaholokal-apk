@@ -1,0 +1,88 @@
+
+name: Build Ionic Android APK
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout project
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # 3. Install dependencies
+      - name: Install npm dependencies
+        run: npm ci
+
+      # 4. Build Ionic/Vue application
+      - name: Build Ionic application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # 5. Verify web icon assets
+      - name: Verify TrabahoLokal web icons
+        run: |
+          test -f dist/trabaho-lokal.png
+          test -f dist/manifest.webmanifest
+          test -f dist/icons/icon-192.webp
+          test -f dist/icons/icon-512.webp
+
+      # 6. Set up Java 21
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # 7. Check Java version
+      - name: Check Java version
+        run: |
+          java -version
+          javac -version
+
+      # 8. Synchronize Capacitor Android
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      # 9. Make Gradle executable
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      # 10. Check Gradle version
+      - name: Check Gradle version
+        working-directory: android
+        run: ./gradlew --version
+
+      # 11. Build Android APK
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      # 12. Rename APK
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk TrabahoLokal.apk
+
+      # 13. Upload APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrabahoLokal-APK
+          path: TrabahoLokal.apk
+          if-no-files-found: error
+          retention-days: 30

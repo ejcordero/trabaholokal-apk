@@ -1,4 +1,4 @@
-<template>
+   <template>
   <div class="admin-app">
     <template v-if="view === 'audit'">
       <AdminAuditLogs @back="view = null" />
