@@ -1,6 +1,6 @@
 
 <template>
-  <AppShell title="Skills Passport" @back="emit('back')">
+  <AppShell title="Skills Passport" back @back="emit('back')">
     <div class="space-y-4">
       <!-- Header actions -->
       <div class="flex justify-end gap-2">

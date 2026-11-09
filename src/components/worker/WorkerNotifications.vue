@@ -1,5 +1,5 @@
 <template>
-  <AppShell title="Notifications" @back="$emit('back')">
+  <AppShell title="Notifications" back @back="$emit('back')">
     <div class="space-y-2">
       <IonButton 
         v-if="unreadCount > 0"

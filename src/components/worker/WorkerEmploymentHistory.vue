@@ -1,6 +1,6 @@
 
 <template>
-  <AppShell title="Work Experience" @back="emit('back')">
+  <AppShell title="Work Experience" back @back="emit('back')">
     <div class="space-y-4 pb-6">
 
       <!-- Introduction -->

@@ -1,9 +1,6 @@
 
 <template>
-  <AppShell
-    title="Find Jobs"
-    :subtitle="subtitle"
-  >
+  <AppShell title="Find Jobs" :subtitle="subtitle">
     <PullRefresh @refresh="loadInitial" :refreshing="refreshing">
       <div class="space-y-3">
 
@@ -33,6 +30,18 @@
           </IonButton>
 
           <IonButton
+            fill="outline"
+            size="default"
+            @click="toggleMap"
+          >
+            <IonIcon
+              :name="mapVisible ? 'list' : 'map'"
+              slot="start"
+            />
+            {{ mapVisible ? 'List' : 'Map' }}
+          </IonButton>
+
+          <IonButton
             fill="clear"
             size="default"
             :disabled="refreshing"
@@ -42,25 +51,69 @@
           </IonButton>
         </div>
 
-        <!-- Location indicator -->
-        <div
-          v-if="useGeo && coords"
-          class="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg"
-        >
-          <CardContent class="p-2 text-xs flex items-center justify-between">
-            <span class="inline-flex items-center gap-1 text-emerald-800 dark:text-emerald-300">
-              <IonIcon name="location" />
-              Within {{ distanceKm }} km of your location
+        <!-- Nearby jobs / Location indicator -->
+        <div class="rounded-lg border border-border bg-card">
+          <CardContent class="p-3 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm font-medium">
+                {{ useGeo ? 'Nearby jobs enabled' : 'Find jobs near you' }}
+              </p>
+
+              <p class="text-xs text-muted-foreground">
+                <template v-if="useGeo && coords">
+                  Showing jobs within {{ distanceKm }} km of your current location.
+                </template>
+
+                <template v-else-if="savedLocationAvailable">
+                  Job distances use your saved profile location.
+                </template>
+
+                <template v-else>
+                  Set your location to see distances to available jobs.
+                </template>
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                v-if="useGeo"
+                type="button"
+                class="text-xs text-primary underline"
+                @click="clearGeo"
+              >
+                Clear
+              </button>
+
+              <IonButton
+                size="small"
+                fill="outline"
+                @click="detectLocation"
+              >
+                {{ useGeo ? 'Refresh GPS' : 'Use my location' }}
+              </IonButton>
+            </div>
+          </CardContent>
+        </div>
+
+        <!-- Nearby search radius -->
+        <div v-if="useGeo && coords" class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium">
+              Nearby search radius
             </span>
 
-            <button
-              type="button"
-              class="text-emerald-700 underline"
-              @click="clearGeo"
-            >
-              Clear
-            </button>
-          </CardContent>
+            <span class="text-xs text-muted-foreground">
+              {{ distanceKm }} km
+            </span>
+          </div>
+
+          <IonRange
+            v-model="distanceKm"
+            :min="1"
+            :max="100"
+            :step="1"
+            @ionChange="loadInitial"
+          />
         </div>
 
         <!-- Offline indicator -->
@@ -110,6 +163,27 @@
           </EmptyState>
         </div>
 
+        <!-- Interactive Google Map -->
+        <div v-if="mapVisible" class="space-y-2">
+          <div
+  ref="mapElement"
+  class="w-full rounded-xl overflow-hidden border border-border"
+  style="height: 420px; min-height: 420px; width: 100%;"
+/>
+
+          <p
+            v-if="mapError"
+            class="text-xs text-muted-foreground"
+          >
+            {{ mapError }}
+          </p>
+
+          <p class="text-xs text-muted-foreground">
+            Job pins show available job locations. Select a pin to view
+            job details or open directions in Google Maps.
+          </p>
+        </div>
+
         <!-- Job list -->
         <div v-else-if="jobs.length > 0" class="space-y-2">
 
@@ -142,20 +216,22 @@
               name="refresh"
               slot="start"
             />
+
             {{ loadingMore ? 'Loading...' : 'Load more' }}
           </IonButton>
-
         </div>
+
       </div>
     </PullRefresh>
 
     <!-- Filter sheet -->
     <IonModal
-      :is-open="filtersOpen"
-      :breakpoints="[0, 0.75, 1]"
-      :initial-breakpoint="0.75"
-      @will-dismiss="filtersOpen = false"
-    >
+  :is-open="filtersOpen"
+  :breakpoints="[0, 0.75, 1]"
+  :initial-breakpoint="0.75"
+  @will-dismiss="filtersOpen = false"
+  @did-present="initializeLocationAutocomplete"
+>
       <IonHeader>
         <IonToolbar>
           <IonTitle>Filters</IonTitle>
@@ -180,20 +256,37 @@
             />
           </Field>
 
-          <!-- Municipality -->
-          <Field label="Municipality">
-            <FormSelect
-              :value="municipalityId"
-              @update:value="municipalityId = $event"
-              :options="[
-                { value: '', label: 'All municipalities' },
-                ...municipalities.map(m => ({
-                  value: m.id,
-                  label: m.name
-                }))
-              ]"
-            />
-          </Field>
+<!-- Search location -->
+<Field
+  label="Search jobs near a location"
+  hint="Type a barangay, municipality, street, or landmark, then select a Google suggestion."
+>
+  <div
+    ref="locationAutocompleteHost"
+    class="w-full"
+  />
+</Field>
+
+<div
+  v-if="locationSearchLabel"
+  class="rounded-lg border p-3 space-y-2"
+>
+  <p class="text-sm font-medium">
+    Selected location
+  </p>
+
+  <p class="text-sm text-muted-foreground">
+    {{ locationSearchLabel }}
+  </p>
+
+  <button
+    type="button"
+    class="text-sm font-medium text-primary"
+    @click="clearGeo"
+  >
+    Clear selected location
+  </button>
+</div>
 
           <!-- Urgency -->
           <Field label="Urgency">
@@ -216,8 +309,8 @@
           <div>
             <div class="flex items-center justify-between mb-1">
               <p class="text-sm font-medium">
-  Sort by distance
-</p>
+                Sort by distance
+              </p>
 
               <button
                 type="button"
@@ -302,7 +395,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch
+} from 'vue'
 
 import {
   IonModal,
@@ -334,13 +434,11 @@ import JobDetailSheet from './JobDetailSheet.vue'
 
 import {
   listJobs,
-  getMunicipalities,
   getWorkerMe,
   JOB_CATEGORIES,
   URGENCY_LEVELS,
   useToast,
   type JobWithMatch,
-  type MunicipalityDTO
 } from '../worker/_lib'
 
 interface WorkerJobsProps {
@@ -355,13 +453,19 @@ const emit = defineEmits<{
 
 const { toast } = useToast()
 
+const locationAutocompleteHost = ref<HTMLDivElement | null>(null)
+
+const locationSearchLabel = ref('')
+
+let locationAutocompleteElement: any = null
+let locationSelectHandler: ((event: any) => void) | null = null
+
 // ---------------------------------------------------------------------------
 // Search and filters
 // ---------------------------------------------------------------------------
 
 const q = ref('')
 const category = ref('')
-const municipalityId = ref('')
 const urgency = ref('')
 
 const minComp = ref<string | number>('')
@@ -381,12 +485,33 @@ const coords = ref<{
   lon: number
 } | null>(null)
 
+const savedCoords = ref<{
+  lat: number
+  lon: number
+} | null>(null)
+
+const savedLocationAvailable = ref(false)
+
+// ---------------------------------------------------------------------------
+// Google Maps state
+// ---------------------------------------------------------------------------
+
+const mapVisible = ref(false)
+const mapElement = ref<HTMLDivElement | null>(null)
+const mapError = ref('')
+
+let googleMap: any = null
+let infoWindow: any = null
+let jobMarkers: any[] = []
+let workerMarker: any = null
+
+let googleMapsPromise: Promise<any> | null = null
+
 // ---------------------------------------------------------------------------
 // Jobs and loading states
 // ---------------------------------------------------------------------------
 
 const jobs = ref<JobWithMatch[]>([])
-const municipalities = ref<MunicipalityDTO[]>([])
 
 const loadingMore = ref(false)
 const refreshing = ref(false)
@@ -408,12 +533,11 @@ let latestRequestId = 0
 const activeFilterCount = computed(() => {
   return [
     category.value,
-    municipalityId.value,
     urgency.value,
     minComp.value,
     maxComp.value
   ].filter(value => String(value).trim() !== '').length
-  + (useGeo.value ? 1 : 0)
+    + (useGeo.value ? 1 : 0)
 })
 
 const subtitle = computed(() => {
@@ -436,6 +560,14 @@ const handleOpenJob = (id: string | null) => {
   emit('open-job-change', id)
 }
 
+const toggleMap = async () => {
+  mapVisible.value = !mapVisible.value
+
+  if (mapVisible.value) {
+    await nextTick()
+    await renderMap()
+  }
+}
 // ---------------------------------------------------------------------------
 // Compensation parsing
 // ---------------------------------------------------------------------------
@@ -470,10 +602,6 @@ const buildQuery = (requestOffset: number) => {
 
   if (category.value) {
     params.category = category.value
-  }
-
-  if (municipalityId.value) {
-    params.municipalityId = municipalityId.value
   }
 
   if (urgency.value) {
@@ -514,7 +642,6 @@ const loadInitial = async () => {
     jobs.value = []
   }
 
-  // Validate compensation range.
   const minimum = parseCompensation(minComp.value)
   const maximum = parseCompensation(maxComp.value)
 
@@ -523,7 +650,9 @@ const loadInitial = async () => {
     maximum !== undefined &&
     minimum > maximum
   ) {
-    error.value = 'Minimum compensation cannot be greater than maximum compensation.'
+    error.value =
+      'Minimum compensation cannot be greater than maximum compensation.'
+
     refreshing.value = false
     initialLoaded.value = true
 
@@ -539,7 +668,6 @@ const loadInitial = async () => {
   try {
     const res = await listJobs(buildQuery(0))
 
-    // Ignore an outdated response.
     if (requestId !== latestRequestId) return
 
     jobs.value = res.data
@@ -601,7 +729,6 @@ const loadMore = async () => {
   try {
     const res = await listJobs(buildQuery(offset.value))
 
-    // Avoid duplicate jobs if the API returns overlapping records.
     const existingIds = new Set(jobs.value.map(job => job.id))
 
     const newJobs = res.data.filter(
@@ -643,12 +770,13 @@ const detectLocation = () => {
   }
 
   navigator.geolocation.getCurrentPosition(
-    (position) => {
+    position => {
       coords.value = {
         lat: position.coords.latitude,
         lon: position.coords.longitude
       }
 
+      locationSearchLabel.value = ''
       useGeo.value = true
       filtersOpen.value = false
 
@@ -657,10 +785,10 @@ const detectLocation = () => {
         duration: 3000
       })
 
-      loadInitial()
+      void loadInitial()
     },
 
-    (geoError) => {
+    geoError => {
       useGeo.value = false
       coords.value = null
 
@@ -690,8 +818,9 @@ const detectLocation = () => {
 const clearGeo = () => {
   useGeo.value = false
   coords.value = null
+  locationSearchLabel.value = ''
 
-  loadInitial()
+  void loadInitial()
 }
 
 // ---------------------------------------------------------------------------
@@ -700,13 +829,12 @@ const clearGeo = () => {
 
 const applyFilters = () => {
   filtersOpen.value = false
-  loadInitial()
+  void loadInitial()
 }
 
 const clearFilters = () => {
   q.value = ''
   category.value = ''
-  municipalityId.value = ''
   urgency.value = ''
 
   minComp.value = ''
@@ -714,29 +842,425 @@ const clearFilters = () => {
 
   useGeo.value = false
   coords.value = null
+  locationSearchLabel.value = ''
 
   distanceKm.value = 30
 
   filtersOpen.value = false
 
-  loadInitial()
+  void loadInitial()
 }
+
+// ---------------------------------------------------------------------------
+// Google Maps loader
+// ---------------------------------------------------------------------------
+
+const loadGoogleMaps = async (): Promise<any> => {
+  const w = window as any
+
+  if (w.google?.maps?.importLibrary) {
+    await w.google.maps.importLibrary('maps')
+    return w.google.maps
+  }
+
+  if (googleMapsPromise) {
+    return googleMapsPromise
+  }
+
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+
+  if (!apiKey) {
+    throw new Error('Google Maps API key is not configured.')
+  }
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const callbackName = '__trabahoLokalGoogleMapsReady'
+
+    w[callbackName] = () => {
+      if (w.google?.maps?.importLibrary) {
+        resolve(w.google.maps)
+      } else {
+        reject(new Error('Google Maps failed to initialize.'))
+      }
+    }
+
+    const existingScript = document.getElementById(
+      'trabaholokal-google-maps'
+    ) as HTMLScriptElement | null
+
+    if (existingScript) {
+      existingScript.addEventListener(
+        'error',
+        () => reject(new Error('Unable to load Google Maps.')),
+        { once: true }
+      )
+
+      return
+    }
+
+    const script = document.createElement('script')
+
+    script.id = 'trabaholokal-google-maps'
+    script.async = true
+    script.defer = true
+
+    script.src =
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
+      `&v=weekly&loading=async&callback=${callbackName}`
+
+    script.onerror = () => {
+      reject(new Error('Unable to load Google Maps.'))
+    }
+
+    document.head.appendChild(script)
+  })
+
+  const maps = await googleMapsPromise
+
+  await maps.importLibrary('maps')
+
+  return maps
+}
+
+// ---------------------------------------------------------------------------
+// Google Places location search
+// ---------------------------------------------------------------------------
+
+const initializeLocationAutocomplete = async () => {
+  await nextTick()
+
+  const host = locationAutocompleteHost.value
+
+  if (!host) return
+
+if (locationAutocompleteElement) {
+  if (locationAutocompleteElement.parentElement !== host) {
+    host.replaceChildren(locationAutocompleteElement)
+  }
+  return
+}
+
+  try {
+    const maps = await loadGoogleMaps()
+    const places = await maps.importLibrary('places')
+
+    const autocomplete = new places.PlaceAutocompleteElement({
+      includedRegionCodes: ['ph']
+    })
+
+    autocomplete.placeholder =
+      'Search barangay, municipality, street, or landmark'
+
+    autocomplete.style.width = '100%'
+
+    locationSelectHandler = async (event: any) => {
+      try {
+        const prediction = event.placePrediction
+
+        if (!prediction) return
+
+        const place = prediction.toPlace()
+
+        await place.fetchFields({
+          fields: ['formattedAddress', 'location']
+        })
+
+        if (!place.location) {
+          toast({
+            message: 'The selected location has no coordinates.',
+            duration: 3000,
+            color: 'danger'
+          })
+          return
+        }
+
+        const latitude = place.location.lat()
+        const longitude = place.location.lng()
+
+        if (
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude)
+        ) {
+          throw new Error('Invalid location coordinates.')
+        }
+
+        coords.value = {
+          lat: latitude,
+          lon: longitude
+        }
+
+        locationSearchLabel.value =
+          place.formattedAddress || 'Selected location'
+
+        useGeo.value = true
+
+        toast({
+          message: 'Location selected. Searching nearby jobs...',
+          duration: 2500
+        })
+
+        await loadInitial()
+      } catch (error) {
+        console.error('Google Places selection failed:', error)
+
+        toast({
+          message: 'Unable to use that location. Please try again.',
+          duration: 3000,
+          color: 'danger'
+        })
+      }
+    }
+
+    autocomplete.addEventListener(
+      'gmp-select',
+      locationSelectHandler
+    )
+
+    locationAutocompleteElement = autocomplete
+    host.replaceChildren(autocomplete)
+  } catch (error) {
+    console.error('Failed to initialize location search:', error)
+
+    toast({
+      message: 'Unable to load Google location search.',
+      duration: 3000,
+      color: 'danger'
+    })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Google Map rendering
+// ---------------------------------------------------------------------------
+
+const renderMap = async () => {
+  if (!mapVisible.value) return
+
+  await nextTick()
+
+  const element = mapElement.value
+
+  if (!element) return
+
+  try {
+    mapError.value = ''
+
+    const maps = await loadGoogleMaps()
+
+    // Only jobs with valid coordinates can have pins.
+    const validJobs = jobs.value.filter(job => {
+      return (
+        job.latitude != null &&
+        job.longitude != null &&
+        Number.isFinite(Number(job.latitude)) &&
+        Number.isFinite(Number(job.longitude)) &&
+        Math.abs(Number(job.latitude)) <= 90 &&
+        Math.abs(Number(job.longitude)) <= 180
+      )
+    })
+
+    const workerLocation = coords.value ?? savedCoords.value
+
+    const firstJob = validJobs[0]
+
+    const center = workerLocation
+  ? {
+      lat: workerLocation.lat,
+      lng: workerLocation.lon
+    }
+  : firstJob
+    ? {
+        lat: Number(firstJob.latitude),
+        lng: Number(firstJob.longitude)
+      }
+    : {
+        // Default map center when no saved location or mapped jobs exist.
+        lat: 12.8797,
+        lng: 121.7740
+      }
+
+    // The map container is recreated when switching between Map and List.
+    // Recreate the map if it points to an old container.
+    if (googleMap && googleMap.getDiv() !== element) {
+      jobMarkers.forEach(marker => marker.setMap(null))
+      jobMarkers = []
+
+      if (workerMarker) {
+        workerMarker.setMap(null)
+        workerMarker = null
+      }
+
+      googleMap = null
+      infoWindow = null
+    }
+
+    if (!googleMap) {
+      googleMap = new maps.Map(element, {
+  center,
+  zoom: workerLocation || firstJob ? 12 : 6,
+  mapTypeControl: true,
+  streetViewControl: false,
+  fullscreenControl: true,
+  gestureHandling: 'greedy'
+})
+
+      infoWindow = new maps.InfoWindow()
+    } else {
+      googleMap.setCenter(center)
+    }
+
+    // Remove previous job markers.
+    jobMarkers.forEach(marker => marker.setMap(null))
+    jobMarkers = []
+
+    // Remove previous worker marker.
+    if (workerMarker) {
+      workerMarker.setMap(null)
+      workerMarker = null
+    }
+
+    // Display worker's saved or manually refreshed location.
+    if (workerLocation) {
+      workerMarker = new maps.Marker({
+        map: googleMap,
+        position: {
+          lat: workerLocation.lat,
+          lng: workerLocation.lon
+        },
+        title: 'Your location',
+        label: 'You'
+      })
+    }
+
+    // Display job location pins.
+    for (const job of validJobs) {
+      const latitude = Number(job.latitude)
+      const longitude = Number(job.longitude)
+
+      const marker = new maps.Marker({
+        map: googleMap,
+        position: {
+          lat: latitude,
+          lng: longitude
+        },
+        title: job.title
+      })
+
+      marker.addListener('click', () => {
+        // Use DOM text nodes instead of inserting job text as HTML.
+        const content = document.createElement('div')
+
+        content.style.maxWidth = '240px'
+
+        const title = document.createElement('strong')
+        title.textContent = job.title
+
+        const location = document.createElement('p')
+        location.textContent =
+          job.locationText ||
+          [job.barangay, job.municipalityName]
+            .filter(Boolean)
+            .join(', ') ||
+          'Location not specified'
+
+        const distance = document.createElement('p')
+        distance.textContent =
+          job.distanceKm != null
+            ? `${Number(job.distanceKm).toFixed(1)} km away`
+            : 'Distance unavailable'
+
+        const detailsButton = document.createElement('button')
+        detailsButton.type = 'button'
+        detailsButton.textContent = 'View job details'
+        detailsButton.style.marginTop = '8px'
+        detailsButton.style.cursor = 'pointer'
+
+        detailsButton.addEventListener('click', () => {
+          handleOpenJob(job.id)
+          infoWindow.close()
+        })
+
+        const directionsLink = document.createElement('a')
+
+        directionsLink.href =
+          `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+
+        directionsLink.target = '_blank'
+        directionsLink.rel = 'noopener noreferrer'
+        directionsLink.textContent = 'Open in Google Maps'
+        directionsLink.style.display = 'block'
+        directionsLink.style.marginTop = '8px'
+
+        content.append(
+          title,
+          location,
+          distance,
+          detailsButton,
+          directionsLink
+        )
+
+        infoWindow.setContent(content)
+
+        infoWindow.open({
+          map: googleMap,
+          anchor: marker
+        })
+      })
+
+      jobMarkers.push(marker)
+    }
+
+    if (validJobs.length === 0) {
+      mapError.value =
+        'No jobs with mapped coordinates are available in the currently loaded results.'
+    }
+
+  } catch (e: any) {
+    console.error('Google Maps error:', e)
+
+    mapError.value =
+      e?.message || 'Unable to display Google Maps.'
+  }
+}
+
+// Refresh the map when its visibility, jobs, or location changes.
+watch(
+  [mapVisible, jobs, coords, savedCoords],
+  () => {
+    if (mapVisible.value) {
+      void renderMap()
+    }
+  },
+  { deep: true }
+)
 
 // ---------------------------------------------------------------------------
 // Initial setup
 // ---------------------------------------------------------------------------
 
-onMounted(async () => {
-  // Load municipality options.
-  try {
-    municipalities.value = await getMunicipalities()
-  } catch (e) {
-    console.error('Failed to load municipalities:', e)
-  }
 
-  // Load the worker's saved preferred search distance.
+onMounted(async () => {
+
+  // Load the worker's saved location and preferred search distance.
   try {
     const profile = await getWorkerMe()
+
+    const latitude = Number(profile?.latitude)
+    const longitude = Number(profile?.longitude)
+
+    savedLocationAvailable.value =
+      profile?.latitude != null &&
+      profile?.longitude != null &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude)
+
+    if (savedLocationAvailable.value) {
+      savedCoords.value = {
+        lat: latitude,
+        lon: longitude
+      }
+    }
+
     const savedDistance = Number(profile?.preferredDistanceKm)
 
     if (
@@ -754,6 +1278,45 @@ onMounted(async () => {
 
   // Load the first page of jobs.
   await loadInitial()
+})
+
+// ---------------------------------------------------------------------------
+// Cleanup
+// ---------------------------------------------------------------------------
+
+onBeforeUnmount(() => {
+  // Clean up Google Places autocomplete.
+  if (locationAutocompleteElement && locationSelectHandler) {
+    locationAutocompleteElement.removeEventListener(
+      'gmp-select',
+      locationSelectHandler
+    )
+  }
+
+  if (locationAutocompleteElement) {
+    locationAutocompleteElement.remove()
+    locationAutocompleteElement = null
+  }
+
+  locationSelectHandler = null
+
+  // Clean up Google Maps job markers.
+  jobMarkers.forEach(marker => marker.setMap(null))
+  jobMarkers = []
+
+  // Clean up worker marker.
+  if (workerMarker) {
+    workerMarker.setMap(null)
+    workerMarker = null
+  }
+
+  // Clean up map information window.
+  if (infoWindow) {
+    infoWindow.close()
+    infoWindow = null
+  }
+
+  googleMap = null
 })
 </script>
 

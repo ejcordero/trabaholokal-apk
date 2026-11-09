@@ -173,13 +173,14 @@ export async function listJobs(
   const limit = filters.limit ?? 20
   const offset = filters.offset ?? 0
 
-  // Load the signed-in worker's matching information and preferences.
   let workerSkills: {
     skillId: string
     level: string
     experienceLevel?: string | null
     verifiedJobCount: number
   }[] = []
+
+  let hasWorkerProfile = false
 
   let workerMuni: string | null = null
   let workerLat: number | null = null
@@ -213,13 +214,15 @@ export async function listJobs(
       .eq('account_id', session.user.id)
       .maybeSingle()
 
-    if (wp) {
-      workerSkills = (wp.skills ?? []).map((s: any) => ({
-        skillId: s.skill_id,
-        level: s.level,
-        experienceLevel: s.experience_level,
-        verifiedJobCount: s.verified_job_count,
-      }))
+      if (wp) {
+        hasWorkerProfile = true
+  
+        workerSkills = (wp.skills ?? []).map((s: any) => ({
+          skillId: s.skill_id,
+          level: s.level,
+          experienceLevel: s.experience_level,
+          verifiedJobCount: s.verified_job_count,
+        }))
 
       workerMuni = wp.municipality_id
       workerLat = wp.latitude
@@ -275,10 +278,17 @@ export async function listJobs(
   // Map job records and calculate their match information.
   const mapRows = (rows: any[]): JobWithMatch[] => {
     return rows.map((r) => {
+
+      const hasManualLocation =
+        filters.lat != null && filters.lon != null
+
+      const distanceLat = hasManualLocation ? filters.lat : workerLat
+      const distanceLon = hasManualLocation ? filters.lon : workerLon
+
       const job = mapJobView(
         r,
-        filters.lat,
-        filters.lon
+        distanceLat,
+        distanceLon
       ) as JobWithMatch
 
       job.preferredCategoryMatch = preferredCategories.some(
@@ -287,7 +297,7 @@ export async function listJobs(
           String(r.category ?? '').trim().toLowerCase()
       )
 
-      if (workerSkills.length) {
+      if (hasWorkerProfile) {
         const match = computeMatch(
           {
             skills: workerSkills,
@@ -295,6 +305,7 @@ export async function listJobs(
             latitude: workerLat,
             longitude: workerLon,
             available,
+            preferences: workerPreferences,
           },
           {
             requiredSkills: (r.required_skills ?? []).map((s: any) => ({
@@ -705,7 +716,7 @@ export async function getEmployment(employmentId: string): Promise<EmploymentDet
   assertError(renewals.error, 'Failed to load renewal requests.')
   assertError(accs.error, 'Failed to load accomplishment reports.')
   assertError(evals.error, 'Failed to load employment evaluations.')
-  
+
   return {
     ...base,
     renewals: (renewals.data ?? []).map((r) => ({
@@ -1048,7 +1059,7 @@ export async function getWorkerProfile(): Promise<WorkerProfileDTO> {
     email: '',
     mobileNumber: wp.mobile_number,
     municipalityId: wp.municipality_id,
-    municipalityName: wp.municipality?.name ?? null,
+    municipalityName: wp.municipality_name ?? wp.municipality?.name ?? null,
     barangay: wp.barangay,
     latitude: wp.latitude,
     longitude: wp.longitude,
@@ -1102,8 +1113,21 @@ export async function getWorkerProfile(): Promise<WorkerProfileDTO> {
   }
 }
 
-
-export async function updateWorkerMe(payload: Partial<{ fullName: string; mobileNumber: string; barangay: string; bio: string; education: string; municipalityId: string; latitude: number; longitude: number; photoUrl: string; preferredDistanceKm: number; available: boolean; preferredCategories: string[] }>): Promise<WorkerProfileDTO> {
+export async function updateWorkerMe(payload: Partial<{
+  fullName: string
+  mobileNumber: string
+  barangay: string
+  bio: string
+  education: string
+  municipalityId: string | null
+  municipalityName: string | null
+  latitude: number | null
+  longitude: number | null
+  photoUrl: string
+  preferredDistanceKm: number
+  available: boolean
+  preferredCategories: string[]
+}>): Promise<WorkerProfileDTO> {
   const userId = await uid()
   const update: Record<string, any> = {}
   if (payload.fullName !== undefined) update.full_name = payload.fullName
@@ -1111,9 +1135,21 @@ export async function updateWorkerMe(payload: Partial<{ fullName: string; mobile
   if (payload.barangay !== undefined) update.barangay = payload.barangay
   if (payload.bio !== undefined) update.bio = payload.bio
   if (payload.education !== undefined) update.education = payload.education
-  if (payload.municipalityId !== undefined) update.municipality_id = payload.municipalityId || null
-  if (payload.latitude !== undefined) update.latitude = payload.latitude
-  if (payload.longitude !== undefined) update.longitude = payload.longitude
+  if (payload.municipalityId !== undefined) {
+    update.municipality_id = payload.municipalityId
+  }
+  
+  if (payload.municipalityName !== undefined) {
+    update.municipality_name = payload.municipalityName
+  }
+  
+  if (payload.latitude !== undefined) {
+    update.latitude = payload.latitude
+  }
+  
+  if (payload.longitude !== undefined) {
+    update.longitude = payload.longitude
+  }
   if (payload.photoUrl !== undefined) update.photo_url = payload.photoUrl
   if (payload.preferredDistanceKm !== undefined) update.preferred_distance_km = payload.preferredDistanceKm
   if (payload.available !== undefined) update.available = payload.available
@@ -1722,6 +1758,60 @@ export async function uploadImage(file: File): Promise<string> {
   return supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl
 }
 
+export async function uploadEmployerVerificationDocument(
+  file: File
+): Promise<string> {
+  const allowedTypes = [
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+  ]
+
+  if (!allowedTypes.includes(file.type)) {
+    throw new ApiError('Only JPG, PNG, and PDF documents are allowed.')
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    throw new ApiError('The document must not exceed 10 MB.')
+  }
+
+  const userId = await uid()
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+
+  if (!['jpg', 'jpeg', 'png', 'pdf'].includes(extension)) {
+    throw new ApiError('Invalid document file extension.')
+  }
+
+  const path = `${userId}/${crypto.randomUUID()}.${extension}`
+
+  const { error } = await supabase.storage
+    .from('employer-verification')
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+
+  if (error) {
+    throw new ApiError(error.message)
+  }
+
+  return path
+}
+
+export async function getEmployerVerificationDocumentUrl(
+  path: string
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('employer-verification')
+    .createSignedUrl(path, 600)
+
+  if (error) {
+    throw new ApiError(error.message)
+  }
+
+  return data.signedUrl
+}
+
 // ---------------------------------------------------------------------------
 // Reports
 // ---------------------------------------------------------------------------
@@ -1811,7 +1901,11 @@ export async function getEmployerProfile(): Promise<EmployerProfileDTO | null> {
   return {
     id: data.id, accountId: userId, email: '', businessName: data.business_name, employerType: data.employer_type,
     contactPerson: data.contact_person, mobileNumber: data.mobile_number, municipalityId: data.municipality_id,
-    municipalityName: data.municipality?.name ?? null, barangay: data.barangay, address: data.address,
+    municipalityName: data.municipality_name ?? data.municipality?.name ?? null,
+barangay: data.barangay,
+address: data.address,
+latitude: data.latitude ?? null,
+longitude: data.longitude ?? null,
     description: data.description, logoUrl: data.logo_url, verification: data.verification,
     verificationNote: data.verification_note, documentUrls: data.document_urls ?? [], createdAt: data.created_at, updatedAt: data.updated_at,
   }
@@ -1825,17 +1919,27 @@ export async function updateEmployerMe(
     mobileNumber: string | null
     barangay: string | null
     address: string | null
+    latitude: number | null
+    longitude: number | null
     description: string | null
     municipalityId: string | null
+    municipalityName: string | null
     logoUrl: string | null
-    documentUrls: string[]
   }>
 ): Promise<EmployerProfileDTO> {
   const userId = await uid()
   const update: Record<string, any> = {}
   for (const [k, v] of Object.entries(payload)) {
-    const map: Record<string, string> = { businessName: 'business_name', employerType: 'employer_type', contactPerson: 'contact_person', mobileNumber: 'mobile_number', municipalityId: 'municipality_id', logoUrl: 'logo_url', documentUrls: 'document_urls' }
-    update[map[k] ?? k] = v
+    const map: Record<string, string> = {
+      businessName: 'business_name',
+      employerType: 'employer_type',
+      contactPerson: 'contact_person',
+      mobileNumber: 'mobile_number',
+      municipalityId: 'municipality_id',
+      municipalityName: 'municipality_name',
+      logoUrl: 'logo_url',
+    }
+        update[map[k] ?? k] = v
   }
   const { error } = await supabase.from('employer_profiles').update(update).eq('account_id', userId)
   assertError(error, 'Failed to update profile.')

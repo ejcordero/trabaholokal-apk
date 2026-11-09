@@ -1,6 +1,6 @@
 
 <template>
-  <AppShell title="Edit Profile" @back="emit('back')">
+<AppShell title="Edit Profile" back @back="emit('back')">
     <div class="space-y-4 pb-6">
       <!-- Loading -->
       <div v-if="loading" class="space-y-3">
@@ -73,27 +73,38 @@
             <div>
               <h2 class="text-base font-semibold">Location</h2>
               <p class="text-sm text-medium">
-                Help employers find workers in their area.
+                Help employers find work opportunities near your location.
               </p>
             </div>
 
-            <IonSelect
-              v-model="form.municipalityId"
+            <!-- Google Places autocomplete -->
+            <div>
+              <label class="text-sm font-medium">
+                Search for a location
+              </label>
+
+              <div
+                ref="autocompleteHost"
+                class="w-full mt-2"
+              />
+
+              <p class="text-xs text-medium mt-2">
+                Search for a barangay, municipality, landmark, or address.
+                Select a Google suggestion to fill in your location details.
+              </p>
+            </div>
+
+            <!-- Municipality -->
+            <IonInput
+              v-model="form.municipalityName"
               label="Municipality"
               label-placement="stacked"
-              placeholder="Select municipality"
-              interface="popover"
+              placeholder="Enter municipality or city"
               fill="outline"
-            >
-              <IonSelectOption
-                v-for="municipality in municipalities"
-                :key="municipality.id"
-                :value="municipality.id"
-              >
-                {{ municipality.name }}
-              </IonSelectOption>
-            </IonSelect>
+              @ionInput="syncMunicipalityId"
+            />
 
+            <!-- Barangay -->
             <IonInput
               v-model="form.barangay"
               label="Barangay"
@@ -103,9 +114,65 @@
               :maxlength="100"
             />
 
+            <!-- Current coordinates -->
+            <div class="space-y-2">
+              <IonButton
+                expand="block"
+                fill="outline"
+                :disabled="locating || saving"
+                @click="useMyLocation"
+              >
+                <IonSpinner
+                  v-if="locating"
+                  name="crescent"
+                  class="mr-2"
+                />
+
+                <IonIcon
+                  v-else
+                  :icon="locateOutline"
+                  slot="start"
+                />
+
+                {{
+                  locating
+                    ? 'Getting location...'
+                    : form.latitude !== null
+                      ? 'Update My Location'
+                      : 'Use My Current Location'
+                }}
+              </IonButton>
+
+              <div
+                v-if="
+                  form.latitude !== null &&
+                  form.longitude !== null
+                "
+                class="text-xs text-medium"
+              >
+                <IonIcon
+                  :icon="checkmarkCircleOutline"
+                  color="success"
+                  class="align-middle"
+                />
+
+                <span class="ml-1">
+                  Coordinates captured:
+                  {{ form.latitude.toFixed(6) }},
+                  {{ form.longitude.toFixed(6) }}
+                </span>
+              </div>
+
+              <p v-else class="text-xs text-medium">
+                No coordinates saved yet. Search for a location or
+                manually capture your current location.
+              </p>
+            </div>
+
             <p class="text-xs text-medium">
-              Your location is used to help match you with nearby opportunities.
-              Your device location is not requested by this form.
+              Your location is used to help match you with nearby
+              opportunities. Your precise coordinates are not displayed
+              to employers.
             </p>
           </IonCardContent>
         </IonCard>
@@ -191,137 +258,140 @@
         </IonCard>
 
         <!-- Work preferences -->
-<IonCard>
-  <IonCardContent class="space-y-4">
-    <div>
-      <h2 class="text-base font-semibold">Work Preferences</h2>
-      <p class="text-sm text-medium">
-        Tell employers what kind of work arrangements suit you.
-        You may leave any field unanswered.
-      </p>
-    </div>
+        <IonCard>
+          <IonCardContent class="space-y-4">
+            <div>
+              <h2 class="text-base font-semibold">Work Preferences</h2>
+              <p class="text-sm text-medium">
+                Tell employers what kind of work arrangements suit you.
+                You may leave any field unanswered.
+              </p>
+            </div>
 
-    <IonSelect
-      v-model="form.employmentTypes"
-      label="Preferred Employment Types"
-      label-placement="stacked"
-      placeholder="Select employment types"
-      interface="alert"
-      :multiple="true"
-      fill="outline"
-    >
-      <IonSelectOption
-        v-for="option in EMPLOYMENT_TYPE_OPTIONS"
-        :key="option.value"
-        :value="option.value"
-      >
-        {{ option.label }}
-      </IonSelectOption>
-    </IonSelect>
+            <IonSelect
+              v-model="form.employmentTypes"
+              label="Preferred Employment Types"
+              label-placement="stacked"
+              placeholder="Select employment types"
+              interface="alert"
+              :multiple="true"
+              fill="outline"
+            >
+              <IonSelectOption
+                v-for="option in EMPLOYMENT_TYPE_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </IonSelectOption>
+            </IonSelect>
 
-    <IonSelect
-      v-model="form.workSchedules"
-      label="Preferred Work Schedules"
-      label-placement="stacked"
-      placeholder="Select schedules"
-      interface="alert"
-      :multiple="true"
-      fill="outline"
-    >
-      <IonSelectOption
-        v-for="option in WORK_SCHEDULE_OPTIONS"
-        :key="option.value"
-        :value="option.value"
-      >
-        {{ option.label }}
-      </IonSelectOption>
-    </IonSelect>
+            <IonSelect
+              v-model="form.workSchedules"
+              label="Preferred Work Schedules"
+              label-placement="stacked"
+              placeholder="Select schedules"
+              interface="alert"
+              :multiple="true"
+              fill="outline"
+            >
+              <IonSelectOption
+                v-for="option in WORK_SCHEDULE_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </IonSelectOption>
+            </IonSelect>
 
-    <IonSelect
-      v-model="form.workArrangements"
-      label="Preferred Work Arrangements"
-      label-placement="stacked"
-      placeholder="Select arrangements"
-      interface="alert"
-      :multiple="true"
-      fill="outline"
-    >
-      <IonSelectOption
-        v-for="option in WORK_ARRANGEMENT_OPTIONS"
-        :key="option.value"
-        :value="option.value"
-      >
-        {{ option.label }}
-      </IonSelectOption>
-    </IonSelect>
+            <IonSelect
+              v-model="form.workArrangements"
+              label="Preferred Work Arrangements"
+              label-placement="stacked"
+              placeholder="Select arrangements"
+              interface="alert"
+              :multiple="true"
+              fill="outline"
+            >
+              <IonSelectOption
+                v-for="option in WORK_ARRANGEMENT_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </IonSelectOption>
+            </IonSelect>
 
-    <div>
-      <label class="text-sm font-medium">Earliest Start Date</label>
-      <IonInput
-        v-model="form.earliestStartDate"
-        type="date"
-        fill="outline"
-        class="mt-2"
-      />
-    </div>
+            <div>
+              <label class="text-sm font-medium">Earliest Start Date</label>
+              <IonInput
+                v-model="form.earliestStartDate"
+                type="date"
+                fill="outline"
+                class="mt-2"
+              />
+            </div>
 
-    <IonSelect
-      v-model="form.willingToRelocate"
-      label="Willing to Relocate?"
-      label-placement="stacked"
-      placeholder="No preference specified"
-      interface="popover"
-      fill="outline"
-    >
-      <IonSelectOption value="yes">Yes</IonSelectOption>
-      <IonSelectOption value="no">No</IonSelectOption>
-    </IonSelect>
+            <IonSelect
+              v-model="form.willingToRelocate"
+              label="Willing to Relocate?"
+              label-placement="stacked"
+              placeholder="No preference specified"
+              interface="popover"
+              fill="outline"
+            >
+              <IonSelectOption value="yes">Yes</IonSelectOption>
+              <IonSelectOption value="no">No</IonSelectOption>
+            </IonSelect>
 
-    <IonSelect
-      v-model="form.willingToLiveIn"
-      label="Willing to Work Live-in?"
-      label-placement="stacked"
-      placeholder="No preference specified"
-      interface="popover"
-      fill="outline"
-    >
-      <IonSelectOption value="yes">Yes</IonSelectOption>
-      <IonSelectOption value="no">No</IonSelectOption>
-    </IonSelect>
+            <IonSelect
+              v-model="form.willingToLiveIn"
+              label="Willing to Work Live-in?"
+              label-placement="stacked"
+              placeholder="No preference specified"
+              interface="popover"
+              fill="outline"
+            >
+              <IonSelectOption value="yes">Yes</IonSelectOption>
+              <IonSelectOption value="no">No</IonSelectOption>
+            </IonSelect>
 
-    <div>
-      <h3 class="text-sm font-medium">Expected Minimum Compensation</h3>
-      <p class="text-xs text-medium mb-2">
-        Optional. Enter your preferred minimum pay.
-      </p>
+            <div>
+              <h3 class="text-sm font-medium">
+                Expected Minimum Compensation
+              </h3>
 
-      <IonInput
-        v-model="form.expectedMinCompensation"
-        type="number"
-        min="0"
-        placeholder="e.g. 500"
-        fill="outline"
-      />
+              <p class="text-xs text-medium mb-2">
+                Optional. Enter your preferred minimum pay.
+              </p>
 
-      <IonSelect
-        v-model="form.compensationType"
-        label="Compensation Basis"
-        label-placement="stacked"
-        placeholder="Select pay basis"
-        interface="popover"
-        fill="outline"
-      >
-        <IonSelectOption
-          v-for="option in COMPENSATION_TYPE_OPTIONS"
-          :key="option.value"
-          :value="option.value"
-        >
-          {{ option.label }}
-        </IonSelectOption>
-      </IonSelect>
-    </div>
-  </IonCardContent>
-</IonCard>
+              <IonInput
+                v-model="form.expectedMinCompensation"
+                type="number"
+                min="0"
+                placeholder="e.g. 500"
+                fill="outline"
+              />
+
+              <IonSelect
+                v-model="form.compensationType"
+                label="Compensation Basis"
+                label-placement="stacked"
+                placeholder="Select pay basis"
+                interface="popover"
+                fill="outline"
+              >
+                <IonSelectOption
+                  v-for="option in COMPENSATION_TYPE_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </IonSelectOption>
+              </IonSelect>
+            </div>
+          </IonCardContent>
+        </IonCard>
 
         <!-- Save -->
         <IonButton
@@ -329,8 +399,18 @@
           :disabled="saving || !form.fullName.trim()"
           @click="saveProfile"
         >
-          <IonSpinner v-if="saving" name="crescent" class="mr-2" />
-          <IonIcon v-else :icon="saveOutline" slot="start" />
+          <IonSpinner
+            v-if="saving"
+            name="crescent"
+            class="mr-2"
+          />
+
+          <IonIcon
+            v-else
+            :icon="saveOutline"
+            slot="start"
+          />
+
           {{ saving ? 'Saving Profile...' : 'Save Changes' }}
         </IonButton>
 
@@ -349,7 +429,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+} from 'vue'
 
 import {
   IonBadge,
@@ -366,7 +452,11 @@ import {
   IonToggle,
 } from '@ionic/vue'
 
-import { saveOutline } from 'ionicons/icons'
+import {
+  saveOutline,
+  locateOutline,
+  checkmarkCircleOutline,
+} from 'ionicons/icons'
 
 import type {
   MunicipalityDTO,
@@ -392,6 +482,10 @@ const emit = defineEmits<{
 }>()
 
 const { toast } = useToast()
+
+// --------------------------------------------------
+// OPTIONS
+// --------------------------------------------------
 
 const EMPLOYMENT_TYPE_OPTIONS = [
   { value: 'regular', label: 'Regular' },
@@ -423,33 +517,67 @@ const COMPENSATION_TYPE_OPTIONS = [
   { value: 'hourly', label: 'Per Hour' },
 ]
 
+// --------------------------------------------------
+// STATE
+// --------------------------------------------------
+
 const loading = ref(true)
 const saving = ref(false)
+const locating = ref(false)
 
 const municipalities = ref<MunicipalityDTO[]>([])
 const profile = ref<WorkerProfileDTO | null>(null)
+
+const autocompleteHost = ref<HTMLDivElement | null>(null)
 
 const form = reactive({
   fullName: '',
   mobileNumber: '',
   bio: '',
   education: '',
+
   municipalityId: '',
+  municipalityName: '',
   barangay: '',
+
+  latitude: null as number | null,
+  longitude: null as number | null,
+
   preferredCategories: [] as string[],
   preferredDistanceKm: 30,
   available: false,
+
   employmentTypes: [] as string[],
   workSchedules: [] as string[],
   workArrangements: [] as string[],
+
   earliestStartDate: '',
+
   willingToRelocate: '' as '' | 'yes' | 'no',
   willingToLiveIn: '' as '' | 'yes' | 'no',
+
   expectedMinCompensation: '',
   compensationType: '',
 })
 
-onMounted(loadProfile)
+// --------------------------------------------------
+// MUNICIPALITY MATCHING
+// --------------------------------------------------
+
+function syncMunicipalityId(): void {
+  const typedName = form.municipalityName.trim().toLowerCase()
+
+  const matched = municipalities.value.find(
+    (municipality) =>
+      municipality.name.trim().toLowerCase() === typedName
+  )
+
+  form.municipalityId = matched?.id ?? ''
+}
+
+// --------------------------------------------------
+// LOAD PROFILE
+// --------------------------------------------------
 
 async function loadProfile(): Promise<void> {
   loading.value = true
@@ -468,8 +596,13 @@ async function loadProfile(): Promise<void> {
     form.mobileNumber = worker.mobileNumber ?? ''
     form.bio = worker.bio ?? ''
     form.education = worker.education ?? ''
+
     form.municipalityId = worker.municipalityId ?? ''
+    form.municipalityName = worker.municipalityName ?? ''
     form.barangay = worker.barangay ?? ''
+
+    form.latitude = worker.latitude ?? null
+    form.longitude = worker.longitude ?? null
 
     form.preferredCategories = [
       ...(worker.preferredCategories ?? []),
@@ -488,24 +621,31 @@ async function loadProfile(): Promise<void> {
       form.employmentTypes = [...preferences.employmentTypes]
       form.workSchedules = [...preferences.workSchedules]
       form.workArrangements = [...preferences.workArrangements]
-      form.earliestStartDate = preferences.earliestStartDate ?? ''
+
+      form.earliestStartDate =
+        preferences.earliestStartDate ?? ''
 
       form.willingToRelocate =
         preferences.willingToRelocate == null
           ? ''
-          : preferences.willingToRelocate ? 'yes' : 'no'
+          : preferences.willingToRelocate
+            ? 'yes'
+            : 'no'
 
       form.willingToLiveIn =
         preferences.willingToLiveIn == null
           ? ''
-          : preferences.willingToLiveIn ? 'yes' : 'no'
+          : preferences.willingToLiveIn
+            ? 'yes'
+            : 'no'
 
       form.expectedMinCompensation =
         preferences.expectedMinCompensation == null
           ? ''
           : String(preferences.expectedMinCompensation)
 
-      form.compensationType = preferences.compensationType ?? ''
+      form.compensationType =
+        preferences.compensationType ?? ''
     }
   } catch (error: any) {
     toast({
@@ -518,12 +658,265 @@ async function loadProfile(): Promise<void> {
   }
 }
 
+// --------------------------------------------------
+// GOOGLE PLACES AUTOCOMPLETE
+// --------------------------------------------------
+
+let autocompleteElement: HTMLElement | null = null
+
+let placeSelectHandler: ((event: Event) => void) | null = null
+
+let googlePlacesPromise: Promise<any> | null = null
+
+async function loadGooglePlaces(): Promise<any> {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+
+  if (!apiKey) {
+    throw new Error(
+      'Google Maps API key is missing. Check your .env file.'
+    )
+  }
+
+  const googleWindow = window as any
+
+  // Reuse Google Maps if it has already loaded.
+  if (googleWindow.google?.maps?.importLibrary) {
+    return googleWindow.google.maps.importLibrary('places')
+  }
+
+  // Avoid loading the Google script multiple times.
+  if (googlePlacesPromise) {
+    return googlePlacesPromise
+  }
+
+  googlePlacesPromise = new Promise<any>((resolve, reject) => {
+    const script = document.createElement('script')
+
+    const callbackName = '__trabahoLokalGoogleMapsReady'
+
+    script.id = 'trabaholokal-google-maps'
+    script.async = true
+    script.defer = true
+
+    googleWindow[callbackName] = async () => {
+      try {
+        const places =
+          await googleWindow.google.maps.importLibrary('places')
+
+        delete googleWindow[callbackName]
+
+        resolve(places)
+      } catch (error) {
+        delete googleWindow[callbackName]
+        reject(error)
+      }
+    }
+
+    script.onerror = () => {
+      delete googleWindow[callbackName]
+
+      googlePlacesPromise = null
+
+      reject(
+        new Error(
+          'Google Maps could not load. Check your API key, billing, and API restrictions.'
+        )
+      )
+    }
+
+    script.src =
+      'https://maps.googleapis.com/maps/api/js' +
+      `?key=${encodeURIComponent(apiKey)}` +
+      '&v=weekly' +
+      '&loading=async' +
+      `&callback=${callbackName}`
+
+    document.head.appendChild(script)
+  })
+
+  return googlePlacesPromise
+}
+
+function getAddressComponent(
+  components: any[],
+  ...types: string[]
+): string {
+  const component = components.find((item: any) =>
+    types.some((type) => item.types.includes(type))
+  )
+
+  return component?.longText ?? ''
+}
+
+async function initializeGoogleAutocomplete(): Promise<void> {
+  try {
+    const places = await loadGooglePlaces()
+
+    // The page may have been closed while Google was loading.
+    if (!autocompleteHost.value) return
+
+    const element = new places.PlaceAutocompleteElement({
+      includedRegionCodes: ['ph'],
+    })
+
+    element.style.width = '100%'
+
+    element.setAttribute(
+      'placeholder',
+      'Search barangay, municipality, or address'
+    )
+
+    placeSelectHandler = async (event: Event) => {
+      try {
+        const prediction = (event as any).placePrediction
+
+        if (!prediction) return
+
+        const place = prediction.toPlace()
+
+        await place.fetchFields({
+          fields: [
+            'addressComponents',
+            'formattedAddress',
+            'location',
+          ],
+        })
+
+        const components = place.addressComponents ?? []
+
+        // Municipality or city.
+        form.municipalityName = getAddressComponent(
+          components,
+          'locality',
+          'administrative_area_level_3',
+          'postal_town'
+        )
+
+        // Barangay or local district, when available.
+        form.barangay = getAddressComponent(
+          components,
+          'sublocality_level_1',
+          'sublocality',
+          'neighborhood',
+          'administrative_area_level_4'
+        )
+
+        // Match the selected municipality to Supabase.
+        syncMunicipalityId()
+
+        // Save selected place coordinates.
+        if (place.location) {
+          form.latitude = place.location.lat()
+          form.longitude = place.location.lng()
+        } else {
+          form.latitude = null
+          form.longitude = null
+        }
+
+        toast({
+          message: 'Location selected. Remember to save your profile.',
+          duration: 3000,
+          color: 'success',
+        })
+      } catch (error: any) {
+        toast({
+          message:
+            error?.message ||
+            'Could not retrieve the selected location.',
+          duration: 3000,
+          color: 'danger',
+        })
+      }
+    }
+
+    element.addEventListener(
+      'gmp-select',
+      placeSelectHandler
+    )
+
+    autocompleteHost.value.replaceChildren(element)
+
+    autocompleteElement = element
+  } catch (error: any) {
+    console.error(
+      'Google Places initialization failed:',
+      error
+    )
+
+    toast({
+      message:
+        error?.message ||
+        'Could not initialize Google Places.',
+      duration: 3000,
+      color: 'danger',
+    })
+  }
+}
+
+// --------------------------------------------------
+// GPS LOCATION
+// --------------------------------------------------
+
+async function useMyLocation(): Promise<void> {
+  if (!navigator.geolocation) {
+    toast({
+      message: 'Location is not supported by this browser.',
+      duration: 3000,
+      color: 'danger',
+    })
+    return
+  }
+
+  locating.value = true
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      form.latitude = position.coords.latitude
+      form.longitude = position.coords.longitude
+
+      locating.value = false
+
+      toast({
+        message: 'Location captured. Remember to save your profile.',
+        duration: 3000,
+        color: 'success',
+      })
+    },
+    (error) => {
+      locating.value = false
+
+      const message =
+        error.code === error.PERMISSION_DENIED
+          ? 'Location permission was denied. Please allow location access in your browser.'
+          : error.code === error.TIMEOUT
+            ? 'Location request timed out. Please try again.'
+            : 'Unable to get your current location.'
+
+      toast({
+        message,
+        duration: 3000,
+        color: 'danger',
+      })
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    }
+  )
+}
+
+// --------------------------------------------------
+// SAVE PROFILE
+// --------------------------------------------------
+
 async function saveProfile(): Promise<void> {
   if (saving.value) return
 
   const fullName = form.fullName.trim()
   const mobileNumber = form.mobileNumber.trim()
   const barangay = form.barangay.trim()
+  const municipalityName = form.municipalityName.trim()
 
   if (!fullName) {
     toast({
@@ -566,69 +959,80 @@ async function saveProfile(): Promise<void> {
 
   const compensationText = form.expectedMinCompensation.trim()
 
-if (
-  compensationText !== '' &&
-  (!Number.isFinite(Number(compensationText)) ||
-    Number(compensationText) < 0)
-) {
-  toast({
-    message: 'Please enter a valid non-negative expected compensation.',
-    duration: 3000,
-    color: 'warning',
-  })
-  return
-}
+  if (
+    compensationText !== '' &&
+    (
+      !Number.isFinite(Number(compensationText)) ||
+      Number(compensationText) < 0
+    )
+  ) {
+    toast({
+      message: 'Please enter a valid non-negative expected compensation.',
+      duration: 3000,
+      color: 'warning',
+    })
+    return
+  }
 
-if (compensationText !== '' && !form.compensationType) {
-  toast({
-    message: 'Please select a compensation basis.',
-    duration: 3000,
-    color: 'warning',
-  })
-  return
-}
+  if (compensationText !== '' && !form.compensationType) {
+    toast({
+      message: 'Please select a compensation basis.',
+      duration: 3000,
+      color: 'warning',
+    })
+    return
+  }
 
   saving.value = true
 
   try {
+    // Save main worker profile, including location.
     const updated = await updateWorkerMe({
       fullName,
       mobileNumber,
       bio: form.bio.trim(),
       education: form.education.trim(),
-      municipalityId: form.municipalityId,
+
+      municipalityId: form.municipalityId || null,
+      municipalityName: municipalityName || null,
       barangay,
+
+      latitude: form.latitude,
+      longitude: form.longitude,
+
       preferredCategories: form.preferredCategories,
       preferredDistanceKm: form.preferredDistanceKm,
       available: form.available,
     })
 
+    // Save work preferences.
     await saveWorkerWorkPreferences({
-  employmentTypes: form.employmentTypes,
-  workSchedules: form.workSchedules,
-  workArrangements: form.workArrangements,
-  earliestStartDate: form.earliestStartDate || null,
+      employmentTypes: form.employmentTypes,
+      workSchedules: form.workSchedules,
+      workArrangements: form.workArrangements,
 
-  willingToRelocate:
-    form.willingToRelocate === ''
-      ? null
-      : form.willingToRelocate === 'yes',
+      earliestStartDate: form.earliestStartDate || null,
 
-  willingToLiveIn:
-    form.willingToLiveIn === ''
-      ? null
-      : form.willingToLiveIn === 'yes',
+      willingToRelocate:
+        form.willingToRelocate === ''
+          ? null
+          : form.willingToRelocate === 'yes',
 
-  expectedMinCompensation:
-    form.expectedMinCompensation.trim() === ''
-      ? null
-      : Number(form.expectedMinCompensation),
+      willingToLiveIn:
+        form.willingToLiveIn === ''
+          ? null
+          : form.willingToLiveIn === 'yes',
 
-  compensationType:
-    form.expectedMinCompensation.trim() === ''
-      ? null
-      : form.compensationType || null,
-})
+      expectedMinCompensation:
+        compensationText === ''
+          ? null
+          : Number(compensationText),
+
+      compensationType:
+        compensationText === ''
+          ? null
+          : form.compensationType || null,
+    })
 
     profile.value = updated
 
@@ -649,4 +1053,31 @@ if (compensationText !== '' && !form.compensationType) {
     saving.value = false
   }
 }
+
+// --------------------------------------------------
+// INITIALIZATION AND CLEANUP
+// --------------------------------------------------
+
+onMounted(async () => {
+  await loadProfile()
+
+  // Wait for the location search container to render.
+  await nextTick()
+
+  await initializeGoogleAutocomplete()
+})
+
+onBeforeUnmount(() => {
+  if (autocompleteElement && placeSelectHandler) {
+    autocompleteElement.removeEventListener(
+      'gmp-select',
+      placeSelectHandler
+    )
+  }
+
+  autocompleteElement?.remove()
+
+  autocompleteElement = null
+  placeSelectHandler = null
+})
 </script>

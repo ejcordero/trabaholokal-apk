@@ -144,6 +144,20 @@ export async function register(payload: {
   return user
 }
 
+export async function signInWithGoogle(): Promise<void> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+      queryParams: {
+        prompt: 'select_account',
+      },
+    },
+  })
+
+  if (error) throw new Error(error.message)
+}
+
 export async function logout(): Promise<void> {
   await supabase.auth.signOut()
   sessionUser.value = null
@@ -189,6 +203,7 @@ export function useSession() {
     sessionLoading,
     login,
     register,
+    signInWithGoogle,
     logout,
     refresh: refreshSession,
     initializeSession,

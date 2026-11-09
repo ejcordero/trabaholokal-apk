@@ -1,6 +1,6 @@
 
 <template>
-  <AppShell title="Skills Profile" @back="emit('back')">
+  <AppShell title="Skills Profile" back @back="emit('back')">
     <div class="space-y-4">
       <!-- Profile summary -->
       <Card>

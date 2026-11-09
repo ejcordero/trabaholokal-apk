@@ -81,7 +81,15 @@ import {
   walletOutline,
   warningOutline,
 } from 'ionicons/icons'
-import { defineComponent, h, ref, type Component, type PropType } from 'vue'
+import {
+  defineComponent,
+  h,
+  ref,
+  watch,
+  onBeforeUnmount,
+  type Component,
+  type PropType,
+} from 'vue'
 import { toastController } from '@ionic/vue'
 
 import { APPLICATION_STATUSES, EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, JOB_CATEGORIES, SKILL_LEVELS } from './_constants'
@@ -417,22 +425,40 @@ export const AppShell = defineComponent({
               'header',
               { class: ['tl-header', props.sticky ? 'tl-sticky' : ''] },
               h('div', { class: 'tl-header-row' }, [
-                props.back
-                  ? h(
-                      'button',
-                      {
-                        type: 'button',
-                        class: 'tl-btn ghost icon',
-                        'aria-label': 'Back',
-                        onClick: () => emit('back'),
-                      },
-                      [iconNode(Icons.ChevronLeft)]
-                    )
-                  : null,
                 h('div', { class: 'tl-header-title-wrap' }, [
                   h('h1', { class: 'tl-header-title' }, props.title),
-                  props.subtitle ? h('p', { class: 'tl-header-sub' }, props.subtitle) : null,
+                  props.subtitle
+                    ? h('p', { class: 'tl-header-sub' }, props.subtitle)
+                    : null,
                 ]),
+                props.back
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      class: 'tl-btn ghost icon',
+                      style: {
+                        width: '40px',
+                        height: '40px',
+                        minWidth: '40px',
+                        fontSize: '25px',
+                      },
+                      'aria-label': 'Close and go back',
+                      title: 'Close and go back',
+                      onClick: () => emit('back'),
+                    },
+                    [
+                      h('span', {
+                        style: {
+                          fontSize: '25px',
+                          fontWeight: '500',
+                          lineHeight: '1',
+                        },
+                        'aria-hidden': 'true',
+                      }, '×')
+                    ]
+                  )
+                : null,
                 slots.right ? h('div', { class: 'tl-header-right' }, slots.right()) : null,
               ])
             )
@@ -1149,27 +1175,78 @@ export const BottomSheet = defineComponent({
   },
   emits: ['close'],
   setup(props, { slots, emit }) {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && props.open) {
+        emit('close')
+      }
+    }
+
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          document.addEventListener('keydown', handleEscape)
+        } else {
+          document.removeEventListener('keydown', handleEscape)
+        }
+      },
+      { immediate: true }
+    )
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('keydown', handleEscape)
+    })
+
     return () =>
       props.open
-        ? h('div', { class: 'tl-sheet-backdrop', onClick: () => emit('close') }, [
-            h(
-              'div',
-              {
-                class: 'tl-sheet',
-                onClick: (e: Event) => e.stopPropagation(),
-              },
-              [
-                h('div', { class: 'tl-sheet-head' }, [
-                  h('h2', props.title),
-                  h('button', { type: 'button', class: 'tl-btn ghost icon', 'aria-label': 'Close', onClick: () => emit('close') }, [
-                    iconNode('Close'),
+        ? h(
+            'div',
+            {
+              class: 'tl-sheet-backdrop',
+              onClick: () => emit('close'),
+              role: 'presentation',
+            },
+            [
+              h(
+                'div',
+                {
+                  class: 'tl-sheet',
+                  role: 'dialog',
+                  'aria-modal': 'true',
+                  'aria-label': props.title || 'Dialog',
+                  onClick: (event: Event) => event.stopPropagation(),
+                },
+                [
+                  h('div', { class: 'tl-sheet-head' }, [
+                    h('h2', props.title),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        class: 'tl-btn ghost icon',
+                        'aria-label': 'Close',
+                        title: 'Close',
+                        onClick: () => emit('close'),
+                      },
+                      [iconNode('Close')]
+                    ),
                   ]),
-                ]),
-                h('div', { style: { padding: '14px 16px' } }, slots.default ? slots.default() : []),
-                slots.footer ? h('div', { style: { padding: '0 16px' } }, slots.footer()) : null,
-              ]
-            ),
-          ])
+                  h(
+                    'div',
+                    { style: { padding: '14px 16px' } },
+                    slots.default ? slots.default() : []
+                  ),
+                  slots.footer
+                    ? h(
+                        'div',
+                        { style: { padding: '0 16px' } },
+                        slots.footer()
+                      )
+                    : null,
+                ]
+              ),
+            ]
+          )
         : null
   },
 })

@@ -387,6 +387,8 @@ export interface EmployerProfileDTO {
   municipalityName?: string | null
   barangay?: string | null
   address?: string | null
+  latitude?: number | null
+longitude?: number | null
   description?: string | null
   logoUrl?: string | null
   verification: string

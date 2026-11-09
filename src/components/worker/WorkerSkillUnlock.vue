@@ -1,7 +1,8 @@
 
 <template>
-  <AppShell
-    title="Skill Unlock"
+<AppShell
+  back
+  title="Skill Unlock"
     subtitle="Discover skills that can open more job opportunities"
     @back="$emit('back')"
   >

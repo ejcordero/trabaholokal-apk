@@ -1,3 +1,4 @@
+
 <template>
   <AppShell title="Verification" back @back="emit('back')">
     <template #right>
@@ -32,16 +33,32 @@
         <template v-if="verification === 'unverified'">
           <div class="tl-card">
             <div class="tl-card-body space-y-3">
-              <p class="text-xs font-semibold uppercase tl-muted">Business documents</p>
+              <p class="text-xs font-semibold uppercase tl-muted">Supporting documents</p>
               <p class="text-xs tl-muted">
-                Upload a business permit, DTI/SEC registration, or a valid ID. Documents are only
-                visible to administrators.
+                Upload a valid ID, business registration, business permit, proof of residence,
+                or another document appropriate to your employer type. Only authorized
+                administrators can review these private documents.
               </p>
 
-              <div v-if="docs.length" class="doc-grid">
-                <div v-for="(url, index) in docs" :key="url" class="doc-item">
-                  <img :src="url" alt="Verification document" />
-                  <button type="button" aria-label="Remove document" @click="removeDoc(index)">
+              <div v-if="docs.length" class="space-y-2">
+                <div
+                  v-for="(path, index) in docs"
+                  :key="path"
+                  class="flex items-center gap-2 rounded-lg border p-3"
+                >
+                  <ion-icon
+                    :icon="isPdf(path) ? Icons.FileText : Icons.Images"
+                    class="text-xl shrink-0"
+                  />
+                  <span class="text-xs flex-1 min-w-0 break-all">
+                    {{ fileName(path) }}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Remove document"
+                    class="text-red-600 p-2"
+                    @click="removeDoc(index)"
+                  >
                     <ion-icon :icon="Icons.Trash2" />
                   </button>
                 </div>
@@ -50,16 +67,24 @@
               <button
                 type="button"
                 class="tl-btn outline"
-                :disabled="uploading"
+                :disabled="uploading || docs.length >= 10"
                 @click="fileInput?.click()"
               >
-                <ion-icon :icon="uploading ? Icons.Loader2 : Icons.CloudUpload" :class="{ 'tl-spin': uploading }" />
-                {{ uploading ? 'Uploading…' : 'Add a document' }}
+                <ion-icon
+                  :icon="uploading ? Icons.Loader2 : Icons.CloudUpload"
+                  :class="{ 'tl-spin': uploading }"
+                />
+                {{ uploading ? 'Uploading...' : 'Add a document' }}
               </button>
+
+              <p class="text-xs tl-muted">
+                JPG, PNG, or PDF. Maximum 10 MB per file and 10 documents.
+              </p>
+
               <input
                 ref="fileInput"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,application/pdf"
                 class="sr-only"
                 @change="onFileChange"
               />
@@ -69,14 +94,23 @@
                   v-model="note"
                   class="tl-textarea"
                   rows="2"
+                  maxlength="1000"
                   placeholder="Anything the reviewer should know"
                 />
               </Field>
 
               <p v-if="formError" class="tl-error">{{ formError }}</p>
 
-              <button type="button" class="tl-btn" :disabled="submitting" @click="submit">
-                <ion-icon :icon="submitting ? Icons.Loader2 : Icons.Send" :class="{ 'tl-spin': submitting }" />
+              <button
+                type="button"
+                class="tl-btn"
+                :disabled="submitting || uploading"
+                @click="submit"
+              >
+                <ion-icon
+                  :icon="submitting ? Icons.Loader2 : Icons.Send"
+                  :class="{ 'tl-spin': submitting }"
+                />
                 Submit for verification
               </button>
             </div>
@@ -86,10 +120,21 @@
         <div v-else-if="submittedDocs.length" class="tl-card">
           <div class="tl-card-body space-y-2">
             <p class="text-xs font-semibold uppercase tl-muted">Submitted documents</p>
-            <div class="doc-grid">
-              <div v-for="url in submittedDocs" :key="url" class="doc-item">
-                <img :src="url" alt="Submitted document" />
-              </div>
+            <p class="text-xs tl-muted">
+              Your submitted documents are stored privately.
+            </p>
+            <div
+              v-for="path in submittedDocs"
+              :key="path"
+              class="flex items-center gap-2 rounded-lg border p-3"
+            >
+              <ion-icon
+                :icon="isPdf(path) ? Icons.FileText : Icons.Images"
+                class="text-xl shrink-0"
+              />
+              <span class="text-xs flex-1 min-w-0 break-all">
+                {{ fileName(path) }}
+              </span>
             </div>
           </div>
         </div>
@@ -111,16 +156,18 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { IonIcon } from '@ionic/vue'
 
 import {
   ApiError,
   getEmployerMe,
   submitVerification,
-  uploadImage,
+  uploadEmployerVerificationDocument,
   useAsync,
   useToast,
   type EmployerProfileDTO,
 } from '../worker/_lib'
+
 import {
   AppShell,
   ErrorRetry,
@@ -167,7 +214,7 @@ const statusStyle = computed(() => {
     case 'pending':
       return {
         title: 'Verification under review',
-        description: 'Administrators are reviewing your documents. This usually takes 1–3 days.',
+        description: 'Administrators are reviewing your documents.',
         icon: Icons.ShieldAlert,
         color: '#d97706',
         bg: '#fffbeb',
@@ -185,7 +232,7 @@ const statusStyle = computed(() => {
     default:
       return {
         title: 'Get verified',
-        description: 'Upload your business documents to earn a verified badge.',
+        description: 'Submit supporting documents for administrator review.',
         icon: Icons.ShieldCheck,
         color: '#0f766e',
         bg: '#f0fdfa',
@@ -203,16 +250,32 @@ watch(
   { immediate: true }
 )
 
+function isPdf(path: string): boolean {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
+function fileName(path: string): string {
+  return path.split('/').pop() || 'Verification document'
+}
+
 async function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
+
   if (!file) return
+
+  if (docs.value.length >= 10) {
+    await toast('You can upload a maximum of 10 documents.', 'danger')
+    return
+  }
+
   uploading.value = true
+
   try {
-    const url = await uploadImage(file)
-    docs.value = [...docs.value, url]
-    await toast('Document uploaded.')
+    const path = await uploadEmployerVerificationDocument(file)
+    docs.value = [...docs.value, path]
+    await toast('Private document uploaded.')
   } catch (e: any) {
     await toast(e?.message || 'Could not upload the document.', 'danger')
   } finally {
@@ -226,14 +289,23 @@ function removeDoc(index: number) {
 
 async function submit() {
   formError.value = ''
+
+  if (uploading.value) {
+    formError.value = 'Please wait for the upload to finish.'
+    return
+  }
+
   if (!docs.value.length) {
     formError.value = 'Upload at least one document.'
     return
   }
+
   submitting.value = true
+
   try {
     await submitVerification(docs.value, note.value.trim() || null)
     await toast('Verification submitted for review.')
+
     if (me.value) {
       setData({
         ...me.value,
@@ -242,17 +314,20 @@ async function submit() {
         verificationNote: note.value.trim() || null,
       })
     }
+
     note.value = ''
     await refresh()
   } catch (e: any) {
     const message = String(e?.message ?? '')
+
     if (e instanceof ApiError && e.status === 409) {
       formError.value = message
-    } else if (/already under review|already verified/i.test(message) || message.includes('23505')) {
-      formError.value = message || 'A verification request is already pending.'
+    } else if (/already under review|already verified/i.test(message)) {
+      formError.value = message
     } else {
       formError.value = message || 'Could not submit verification.'
     }
+
     await toast(formError.value, 'danger')
   } finally {
     submitting.value = false
@@ -260,36 +335,4 @@ async function submit() {
 }
 </script>
 
-<style scoped>
-.doc-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.doc-item {
-  position: relative;
-}
-.doc-item img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid var(--tl-border);
-}
-.doc-item button {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(17, 24, 39, 0.72);
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-}
-</style>
+

@@ -91,6 +91,64 @@
           </div>
         </div>
 
+        <SectionTitle>Verification documents</SectionTitle>
+
+<div class="tl-card">
+  <div class="tl-card-body space-y-3">
+    <p
+      v-if="verificationDocumentsLoading"
+      class="text-sm tl-muted"
+    >
+      Loading private documents...
+    </p>
+
+    <p
+      v-else-if="!verificationDocuments.length"
+      class="text-sm tl-muted"
+    >
+      No verification documents have been submitted.
+    </p>
+
+    <div
+      v-for="doc in verificationDocuments"
+      :key="doc.path"
+      class="rounded-lg border p-3 space-y-2"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <IonIcon
+          :icon="isVerificationPdf(doc.path) ? Icons.FileText : Icons.Images"
+          class="text-xl shrink-0"
+        />
+        <span class="text-sm font-medium break-all flex-1">
+          {{ verificationFileName(doc.path) }}
+        </span>
+      </div>
+
+      <template v-if="doc.url">
+        <img
+          v-if="!isVerificationPdf(doc.path)"
+          :src="doc.url"
+          :alt="verificationFileName(doc.path)"
+          class="w-full max-h-80 object-contain rounded-lg bg-gray-50"
+        />
+
+        <a
+          :href="doc.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="tl-btn outline block text-center"
+        >
+        {{ isVerificationPdf(doc.path) ? 'Open PDF' : 'Open document' }}
+        </a>
+      </template>
+
+      <p v-else class="text-xs text-red-600">
+        This document could not be opened. Refresh and try again.
+      </p>
+    </div>
+  </div>
+</div>
+
         <template v-if="account.jobs && account.jobs.length > 0">
           <SectionTitle>Jobs</SectionTitle>
           <div class="tl-list">
@@ -227,6 +285,7 @@ import {
   EMPLOYER_TYPES,
   adminGetUser,
   adminUserAction,
+  getEmployerVerificationDocumentUrl,
   formatDate,
   labelFor,
   useAsync,
@@ -286,6 +345,71 @@ watch(
 const isWorker = computed(() => account.value?.role === 'worker')
 const isEmployer = computed(() => account.value?.role === 'employer')
 const isAdmin = computed(() => account.value?.role === 'admin')
+
+type VerificationDocument = {
+  path: string
+  url: string | null
+}
+
+const verificationDocuments = ref<VerificationDocument[]>([])
+const verificationDocumentsLoading = ref(false)
+
+let documentRequestId = 0
+
+watch(
+  () => [
+    props.userId,
+    account.value?.employerProfile?.document_urls,
+  ] as const,
+  async ([userId, rawPaths]) => {
+    const requestId = ++documentRequestId
+
+    verificationDocuments.value = []
+
+    const paths: string[] = Array.isArray(rawPaths)
+      ? rawPaths.filter((path: unknown): path is string =>
+          typeof path === 'string' && path.length > 0
+        )
+      : []
+
+    if (!userId || !paths.length) {
+      verificationDocumentsLoading.value = false
+      return
+    }
+
+    verificationDocumentsLoading.value = true
+
+    try {
+      const results = await Promise.all(
+        paths.map(async (path) => {
+          try {
+            const url = await getEmployerVerificationDocumentUrl(path)
+            return { path, url }
+          } catch {
+            return { path, url: null }
+          }
+        })
+      )
+
+      if (requestId !== documentRequestId) return
+
+      verificationDocuments.value = results
+    } finally {
+      if (requestId === documentRequestId) {
+        verificationDocumentsLoading.value = false
+      }
+    }
+  },
+  { immediate: true }
+)
+
+function isVerificationPdf(path: string): boolean {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
+function verificationFileName(path: string): string {
+  return path.split('/').pop() || 'Verification document'
+}
 
 const displayName = computed<string>(() => {
   const a = account.value

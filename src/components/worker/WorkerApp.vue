@@ -44,7 +44,7 @@
     <BottomTabs 
       :items="tabs" 
       :active="tab" 
-      @change="tab = $event" 
+      @change="handleTabChange"
     />
   </div>
 </template>
@@ -74,6 +74,15 @@ const props = defineProps<WorkerAppProps>()
 
 const { user } = useSession()
 const tab = ref<'home' | 'jobs' | 'applications' | 'work' | 'account'>('home')
+const handleTabChange = (
+  nextTab: typeof tab.value
+) => {
+  // Close the currently displayed secondary page.
+  view.value = null
+
+  // Navigate to the selected bottom tab.
+  tab.value = nextTab
+}
 const view = ref<{
   name:
     | 'skills-profile'
