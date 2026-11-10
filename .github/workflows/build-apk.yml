@@ -24,61 +24,88 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # 3. Install dependencies
+      # 3. Install npm dependencies
       - name: Install npm dependencies
         run: npm ci
 
-      # 4. Build Ionic/Vue application
+      # 4. Verify Supabase environment variables
+      - name: Verify Supabase environment
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            echo "ERROR: VITE_SUPABASE_URL is missing!"
+            exit 1
+          fi
+
+          if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "ERROR: VITE_SUPABASE_ANON_KEY is missing!"
+            exit 1
+          fi
+
+          echo "SUCCESS: Both Supabase variables are available."
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # 5. Build Ionic/Vue application
       - name: Build Ionic application
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      # 5. Verify web icon assets
-      - name: Verify TrabahoLokal web icons
+      # 6. Verify web assets
+      - name: Verify TrabahoLokal web assets
         run: |
+          test -f dist/index.html
           test -f dist/trabaho-lokal.png
           test -f dist/manifest.webmanifest
           test -f dist/icons/icon-192.webp
           test -f dist/icons/icon-512.webp
 
-      # 6. Set up Java 21
+          echo "SUCCESS: All required web assets are present."
+
+      # 7. Set up Java 21
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # 7. Check Java version
+      # 8. Check Java version
       - name: Check Java version
         run: |
           java -version
           javac -version
 
-      # 8. Synchronize Capacitor Android
+      # 9. Synchronize Capacitor Android
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      # 9. Make Gradle executable
+      # 10. Make Gradle executable
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      # 10. Check Gradle version
+      # 11. Check Gradle version
       - name: Check Gradle version
         working-directory: android
         run: ./gradlew --version
 
-      # 11. Build Android APK
+      # 12. Build Android APK
       - name: Build Android APK
         working-directory: android
         run: ./gradlew assembleDebug
 
-      # 12. Rename APK
+      # 13. Verify generated APK
+      - name: Verify generated APK
+        run: |
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          echo "SUCCESS: Android APK generated."
+
+      # 14. Rename APK
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk TrabahoLokal.apk
 
-      # 13. Upload APK
+      # 15. Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
